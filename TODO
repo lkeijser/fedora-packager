@@ -1,0 +1,2 @@
+* Make Makefile work
+* add SPEC file,  we will require rpmdevtools, koji, plague, ??
