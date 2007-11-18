@@ -66,6 +66,67 @@ serverca = ~/.fedora-server-ca.cert
 
 EOF
 
+cat > ~/.koji/arm-config <<EOF
+[koji]
+
+;configuration for koji cli tool
+
+;url of XMLRPC server
+server = http://arm.koji.fedoraproject.org/kojihub
+
+;url of web interface
+weburl = http://arm.koji.fedoraproject.org/koji
+
+;url of package download site
+pkgurl = http://arm.koji.fedoraproject.org/packages
+
+;path to the koji top directory
+;topdir = /mnt/koji
+
+;configuration for SSL athentication
+
+;client certificate
+cert = ~/.fedora.cert
+
+;certificate of the CA that issued the client certificate
+ca = ~/.fedora-upload-ca.cert
+
+;certificate of the CA that issued the HTTP server certificate
+serverca = ~/.fedora-server-ca.cert
+
+EOF
+
+cat > ~/.koji/sparc-config <<EOF
+[koji]
+
+;configuration for koji cli tool
+
+;url of XMLRPC server
+server = http://sparc.koji.fedoraproject.org/kojihub
+
+;url of web interface
+weburl = http://sparc.koji.fedoraproject.org/koji
+
+;url of package download site
+pkgurl = http://sparc.koji.fedoraproject.org/packages
+
+;path to the koji top directory
+;topdir = /mnt/koji
+
+;configuration for SSL athentication
+
+;client certificate
+cert = ~/.fedora.cert
+
+;certificate of the CA that issued the client certificate
+ca = ~/.fedora-upload-ca.cert
+
+;certificate of the CA that issued the HTTP server certificate
+serverca = ~/.fedora-server-ca.cert
+
+EOF
+
+
 cat <<EOF
 Creating an SSL certificate to import into your browser, to enable
 user authentication at http://koji.fedoraproject.org/koji/
