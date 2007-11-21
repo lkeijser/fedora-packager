@@ -9,11 +9,10 @@ URL:            https://hosted.fedoraproject.org/projects/fedora-packager/
 Source0:        %{name}-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-BuildRequires:  
 Requires:       koji bodhi-client plague-client
-Requires:       rpm-build rpmdevtools 
+Requires:       rpm-build rpmdevtools rpmlint
 Requires:       cvs mercurial git bzr
-Requires:       
+Requires:       gcc gcc-c++ mock
 
 %description
 Set of utilities useful for a fedora packager in setting up thier environment.
@@ -39,6 +38,7 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root,-)
 %doc
+%{_bindir}/fedora-packager-setup.sh
 
 
 
