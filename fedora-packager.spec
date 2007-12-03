@@ -22,12 +22,11 @@ Set of utilities useful for a fedora packager in setting up thier environment.
 
 
 %build
-%configure
-make %{?_smp_mflags}
 
 
 %install
 rm -rf $RPM_BUILD_ROOT
+mkdir -p $RPM_BUILD_ROOT%{_bindir}
 make install DESTDIR=$RPM_BUILD_ROOT
 
 
@@ -39,6 +38,7 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root,-)
 %doc
 %{_bindir}/fedora-packager-setup.sh
+%{_bindir}/fedora-cvs
 
 
 
