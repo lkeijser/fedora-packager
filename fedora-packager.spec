@@ -1,5 +1,5 @@
 Name:           fedora-packager
-Version:        0.1
+Version:        0.1.1
 Release:        1%{?dist}
 Summary:        Tools for setting up a fedora maintainer environment
 
@@ -17,7 +17,7 @@ Requires:       gcc gcc-c++ mock
 BuildArch:      noarch
 
 %description
-Set of utilities useful for a fedora packager in setting up thier environment.
+Set of utilities useful for a fedora packager in setting up their environment.
 
 %prep
 %setup -q
@@ -45,5 +45,9 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %changelog
-* Sun Nov 11 2008 Dennis Gilmore <dennis@ausil.us> - 0.1-1
+* Mon Dec 03 2007 Dennis Gilmore <dennis@ausil.us> - 0.1.1-1
+- fix typo in description 
+- update to 0.1.1  fixes typo in fedora-cvs
+
+* Sun Nov 11 2007 Dennis Gilmore <dennis@ausil.us> - 0.1-1
 - initial build

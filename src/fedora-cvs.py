@@ -6,7 +6,7 @@ import sys
 import commands
 
 def readUser():
-    ''' samle line "Subject: C=US, ST=North Carolina, O=Fedora Project, OU=Dennis Gilmore, CN=ausil/emailAddress=dennis@ausil.us" '''
+    ''' sample line "Subject: C=US, ST=North Carolina, O=Fedora Project, OU=Dennis Gilmore, CN=ausil/emailAddress=dennis@ausil.us" '''
     userCert = ""
     if os.access(os.path.join(os.path.expanduser('~'),".fedora.cert"), os.R_OK):
             userCert = open(os.path.join(os.path.expanduser('~'),".fedora.cert"), "r").read()
