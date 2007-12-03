@@ -6,7 +6,7 @@ Summary:        Tools for setting up a fedora maintainer environment
 Group:          Applications/Productivity
 License:        GPLv2+
 URL:            https://hosted.fedoraproject.org/projects/fedora-packager/
-Source0:        https://hosted.fedoraproject.org/projects/fedora-packager/attachment/wiki/WikiStart/fedora-packager-0.1.tar.bz2
+Source0:        https://hosted.fedoraproject.org/projects/fedora-packager/attachment/wiki/WikiStart/fedora-packager-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 Requires:       koji bodhi-client plague-client
