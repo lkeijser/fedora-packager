@@ -26,24 +26,31 @@ def readUser():
 
 def cvsco(user, module):
     '''CVSROOT=:ext:ausil@cvs.fedoraproject.org:/cvs/extras/'''
-    (s, o) = commands.getstatusoutput("CVSROOT=:ext:%s@cvs.fedoraproject.org:/cvs/extras/ CVS_RSH=ssh cvs co %s" % (user, module))
+    print "Checking out %s from fedora cvs:" % module
+    (s, o) = commands.getstatusoutput("CVSROOT=:ext:%s@cvs.fedoraproject.org:/cvs/pkgs/ CVS_RSH=ssh cvs co %s" % (user, module))
     if s != 0:
         print "Error: %s" % o
     else:
         print o
 
+def usage():
+    print """
+    add the modules you wish to check out from cvs
+    example fedora-cvs konversation mysql cvs mercurial
+    """
 
 def main(pkg):
     userName = readUser()
-    cvsco(userName, pkg)
+    for Item in pkg:
+        cvsco(userName, Item)
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print "you need to specify the module to checkout of cvs"
+        usage()
         sys.exit(1)
-
     #the package we want to pull from cvs 
-    pkg = sys.argv[1]
+    pkg = sys.argv
+    pkg.remove(sys.argv[0])
 
     main(pkg)
 
