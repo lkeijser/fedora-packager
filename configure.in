@@ -1,5 +1,5 @@
 AC_INIT
-AM_INIT_AUTOMAKE(fedora-packager,0.1.1)
+AM_INIT_AUTOMAKE(fedora-packager,0.2.0)
 AC_PATH_PROGS(PYTHON, python)
 AC_PATH_PROGS(BASH, sh bash)
 AC_OUTPUT(Makefile)

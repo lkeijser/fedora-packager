@@ -36,36 +36,6 @@ fi
 # remove existing contents of ~/.koji to avoid confusion
 rm -f ~/.koji/*
 
-cat > ~/.koji/config <<EOF
-[koji]
-
-;configuration for koji cli tool
-
-;url of XMLRPC server
-server = http://koji.fedoraproject.org/kojihub
-
-;url of web interface
-weburl = http://koji.fedoraproject.org/koji
-
-;url of package download site
-pkgurl = http://koji.fedoraproject.org/packages
-
-;path to the koji top directory
-;topdir = /mnt/koji
-
-;configuration for SSL athentication
-
-;client certificate
-cert = ~/.fedora.cert
-
-;certificate of the CA that issued the client certificate
-ca = ~/.fedora-upload-ca.cert
-
-;certificate of the CA that issued the HTTP server certificate
-serverca = ~/.fedora-server-ca.cert
-
-EOF
-
 for arch in arm alpha ia64 sparc s390 ;do 
 cat > ~/.koji/$arch-config <<EOF
 [koji]
