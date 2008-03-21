@@ -1,3 +1,7 @@
+* Dennis Gilmore <dennis@ausil.us> - 0.2.0
+- fedora-cvs now allows checking out multiple modules
+- update urls for fedorahosted
+- update for fas2
 * Dennis Gilmore <dennis@ausil.us> - 0.1
 - Initial release we have a comps group 
 - fedora-packager-setup.sh and fedora-cvs
