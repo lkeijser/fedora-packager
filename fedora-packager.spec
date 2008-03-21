@@ -1,17 +1,17 @@
 Name:           fedora-packager
-Version:        0.1.1
+Version:        0.2.0
 Release:        1%{?dist}
 Summary:        Tools for setting up a fedora maintainer environment
 
 Group:          Applications/Productivity
 License:        GPLv2+
-URL:            https://hosted.fedoraproject.org/projects/fedora-packager/
-Source0:        https://hosted.fedoraproject.org/projects/fedora-packager/attachment/wiki/WikiStart/fedora-packager-%{version}.tar.bz2
+URL:            https://fedorahosted.org/fedora-packager
+Source0:        https://fedorahosted.org/fedora-packager/attachment/wiki/WikiStart/fedora-packager-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 Requires:       koji bodhi-client plague-client
 Requires:       rpm-build rpmdevtools rpmlint
-Requires:       cvs mercurial git bzr
+Requires:       cvs mercurial git-core bzr
 Requires:       gcc gcc-c++ mock
 
 BuildArch:      noarch
@@ -45,6 +45,11 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %changelog
+* Thu Mar 20 2008 Dennis Gilmore <dennis@ausil.us> - 0.2.0-1
+- update to 0.2.0  fedora-cvs now allows checking out multiple modules
+- new url for fas2
+- update links to fedorahosted
+
 * Mon Dec 03 2007 Dennis Gilmore <dennis@ausil.us> - 0.1.1-1
 - fix typo in description 
 - update to 0.1.1  fixes typo in fedora-cvs
