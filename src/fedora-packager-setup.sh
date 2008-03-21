@@ -14,7 +14,7 @@ echo "Setting up Koji client..."
 
 if [ ! -f ~/.fedora.cert ]; then
     echo "You need a client certificate from the Fedora Account System"
-    echo "Please download one from https://admin.fedoraproject.org/accounts/gen-cert.cgi"
+    echo "Please download one from https://admin.fedoraproject.org/accounts/user/gencert"
     echo "Save it to ~/.fedora.cert and re-run this script"
     exit 1
 fi
