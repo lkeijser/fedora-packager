@@ -438,8 +438,8 @@ fedora-cvs: $(srcdir)/src/fedora-cvs.py
 
 fedora-packager-setup.sh: $(srcdir)/src/fedora-packager-setup.sh
 	rm -f fedora-packager-setup.sh
-	cp -p $(srcdir)/src/fedora-packager-setup.sh fedora-packager-setup.sh
-	chmod ugo+x fedora-packager-setup.sh
+	cp -p $(srcdir)/src/fedora-packager-setup.sh fedora-packager-setup
+	chmod ugo+x fedora-packager-setup
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

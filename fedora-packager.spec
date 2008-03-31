@@ -1,5 +1,5 @@
 Name:           fedora-packager
-Version:        0.2.0
+Version:        0.3.0
 Release:        1%{?dist}
 Summary:        Tools for setting up a fedora maintainer environment
 
@@ -11,8 +11,7 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 Requires:       koji bodhi-client plague-client
 Requires:       rpm-build rpmdevtools rpmlint
-Requires:       cvs mercurial git-core bzr
-Requires:       gcc gcc-c++ mock
+Requires:       mock pyOpenSSL
 
 BuildArch:      noarch
 
@@ -39,12 +38,17 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root,-)
 %doc COPYING TODO AUTHORS ChangeLog
-%{_bindir}/fedora-packager-setup.sh
+%{_bindir}/fedora-packager-setup
 %{_bindir}/fedora-cvs
 
 
 
 %changelog
+* Sun Mar 30 2008 Dennis Gilmore <dennis@ausil.us> - 0.3.0-1
+- update to 0.3.0 fedora-cvs uses pyOpenSSL to work out username
+- remove Requires on RCS's for fedora-hosted
+- rename fedora-packager-setup.sh to fedora-packager-setup
+
 * Thu Mar 20 2008 Dennis Gilmore <dennis@ausil.us> - 0.2.0-1
 - update to 0.2.0  fedora-cvs now allows checking out multiple modules
 - new url for fas2

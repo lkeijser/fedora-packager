@@ -1,0 +1,241 @@
+#!/bin/bash
+#
+# fedoradev-pkgowners - Output list of packages owners by packages name
+# Copyright (c) 2007 Thorsten Leemhuis <fedora@leemhuis.info>
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+
+## globally used
+file_fadcsvdata=
+file_pkgdbfiledata=
+list_of_packages=
+print_comaintainers=
+print_email=
+print_realname=
+tmpfile_owners=
+
+##  globally used with defaults
+myprog_name=fedoradev-pkgowners
+myprog_version=0.0.1
+# look for Fedora (and not epel) by default:
+filter_for="Fedora"
+
+# initialization
+this_init()
+{
+	# we need to get the package names from somewhere
+	# if there is a better way to check that input is comeing from a 
+	#  pipe please let me know
+	if [[ ! "${list_of_packages}" ]] && [[ ! -p /proc/$$/fd/0 ]]; then
+		echo "Provide list of package names on command line or via pipe" >&2
+		exit 2
+	fi
+
+	# we need fasfile for some optional output options
+	if ( [[ "${print_email}" ]] || [[ "${print_realname}" ]] ) && [[ ! "${file_fadcsvdata}" ]] ; then
+		echo "Please provide the name of the file with the FAS dumb via --fasfile <file>" >&2
+		echo " Download it using your FAS username and password from:" >&2
+		echo " https://admin.fedora.redhat.com/accounts/dump-group.cgi?group=cvsextras&format=csv"  >&2
+		exit 2
+	fi
+
+	# check fasfile -- needs to be local, thus check first
+	if [[ "${file_fadcsvdata}" ]]; then
+		if [[ ! -s "${file_fadcsvdata}" ]]; then
+			echo "Could not find fas-datafile ${file_fadcsvdata}" >&2
+			exit 2
+		fi
+
+		# check if that file contains data as we expect it
+		if ! grep --max-count=1 -E '^.*,.*@.*,(user|sponsor|administrator),[0-9]*$' "${file_fadcsvdata}" &>/dev/null; then
+			echo "File ${file_fadcsvdata} does not look like a fas file in cvs format" >&2
+			exit 2
+		fi
+	fi
+
+	# pkgdb bugzilla data for owners
+	if [[ "${file_pkgdbfiledata}" ]]; then
+		if [[ ! -s "${file_pkgdbfiledata}" ]]; then
+			echo "Could not find pgkdb-datafile ${file_pkgdbfiledata}" >&2
+			exit 2
+		fi
+	else
+		# download it to tmpfile
+	
+		# remove tmpfile_owners on CTRL+C
+		trap "this_finish" 2
+
+		# download owners
+		tmpfile_owners=$(mktemp -t ${myprog_name}.XXXXXXXXX)
+		wget --quiet --output-document="${tmpfile_owners}" "https://admin.fedoraproject.org/pkgdb/acls/bugzilla?tg_format=plain"
+	
+		# did download of owners succeed?
+		local returncode=$?
+		if (( ${returncode} > 0 )) || [[ ! -s "${tmpfile_owners}" ]] ; then
+			echo "Could not download informations about owners from"$'\n'"https://admin.fedoraproject.org/pkgdb/acls/bugzilla?tg_format=plain ; aborting!" >&2
+			this_finish
+			exit 2
+		fi
+
+		# 
+		file_pkgdbfiledata="${tmpfile_owners}"
+	fi
+
+	# check if that file contains data as we expect it
+	if ! grep --max-count=1 -E '^Fedora*\|.*\|.*\|.*\|\|' "${file_pkgdbfiledata}" &>/dev/null; then
+		echo "File ${file_pkgdbfiledata} does not look like a pgkdb bugzilla dump" >&2
+		this_finish
+		exit 2
+	fi
+}
+
+lookup_package()
+{
+	local package_info="$(grep "${filter_for}|${1}|" "${file_pkgdbfiledata}")"
+	local owner="$(echo ${package_info} | cut -d '|' -f 4)"
+	if [[ ! "${owner}" ]]; then
+		# grep did not find anything or something else went wrong
+		echo "Could not find owner for ${1}" >&2
+		return 1
+	fi
+
+
+	# co-maintainers?
+	if [[ "${print_comaintainers}" ]]; then
+		local comaintainers="$(echo ${package_info} | cut -d '|' -f 6 | sed 's| |,|g') "
+		if [[ "${comaintainers}" = " " ]]; then
+			comaintainers="(none)"
+		fi
+	fi
+
+	# more data?
+	if [[ "${print_email}" ]] || [[ "${print_realname}" ]]; then
+		local fasline="$(grep -E "^${owner},.*@.*,(user|sponsor|administrator),[0-9]*$" "${file_fadcsvdata}")"
+		if [[ "${fasline}" ]]; then
+			[[ "${print_email}" ]] && local email_owner="$(echo ${fasline} | cut -d ',' -f 2) "
+			[[ "${print_realname}" ]] && local realname_owner="$(echo ${fasline} | cut -d ',' -f 3) "
+		else
+			echo "Could not find FAS-data for ${owner}" >&2
+			[[ "${print_email}" ]] && local email_owner="(unknown) "
+			[[ "${print_realname}" ]] && local realname_owner="(unknown) "
+		fi
+
+		# feature for later: print more info for co-maintainers as well?
+	fi
+	
+	# print
+	echo "${owner} ${1} ${email_owner}${realname_owner}${comaintainers}"
+}
+
+this_finish()
+{
+	[[ -e "${tmpfile_owners}" ]] && rm "${tmpfile_owners}"
+}
+
+myprog_help()
+{
+	echo "Usage: ${myprog_name}  [options] [list of pkgnames]"
+	echo "       echo pkgname | ${myprog_name} [options]"
+	echo $'\n'"Outputs list of Fedora packages owners for packages from [list] or stdin"
+	echo $'\n'"Available options:"
+	echo " --comaintainers    -- print comaintainers as well"
+	echo " --email            -- print email (needs --fasfile<file>)"
+	echo " --epel             -- look epel owner(s) up"
+	echo " --fasfile <file>   -- get email or real name from fas-file ; download uri:"
+	echo "   https://admin.fedora.redhat.com/accounts/dump-group.cgi?group=cvsextras&format=csv"
+	echo " --pkgdbfile <file> -- get pkgowners from local file instead of downloading it from:"
+	echo "   https://admin.fedoraproject.org/pkgdb/acls/bugzilla?tg_format=plain"
+	echo " --realname         -- print realname (needs --fasfile <file>)"
+	echo
+	echo " --help             -- this text"
+	echo " --version          -- output version"
+	echo
+	echo " Hint: use '${myprog_name} | sort | column -t' for properly formated output."
+}
+
+# parse cmdline options
+while [ "${1}" ] ; do
+	case "${1}" in
+		--comaintainers)
+			print_comaintainers="true"
+			shift
+			;;
+		--email)
+			print_email="true"
+			shift
+			;;
+		--epel)
+			filter_for="Fedora EPEL"
+			shift
+			;;
+		--fasfile)
+			shift
+			file_fadcsvdata="${1}"
+			shift
+			;;
+		--realname)
+			print_realname="true"
+			shift
+			;;
+		--pkgdbfile)
+			shift
+			file_pkgdbfiledata="${1}"
+			shift
+			;;
+		--help)
+			myprog_help
+			exit 0
+			;;
+		--version)
+			echo "${myprog_name} ${myprog_version}"
+			exit 0
+			;;
+		--*)
+			echo "Error: Unknown option '${1}'." >&2
+			myprog_help >&2
+			exit 2
+			;;
+		*)
+			list_of_packages="${list_of_packages} ${1}"
+			shift
+			;;
+	esac
+done
+
+# initialization and startup checks
+this_init
+
+# go
+if [[ "${list_of_packages}" ]]; then
+	for package in ${list_of_packages} ; do
+		lookup_package ${package}
+	done
+elif [[ -p /proc/$$/fd/0 ]]; then
+	# read list of packages from stdin (seperated by newline or space)
+	while read list_of_packages ; do
+		for package in ${list_of_packages} ; do
+			lookup_package ${package}
+		done
+	done
+fi
+
+# cleanup
+this_finish

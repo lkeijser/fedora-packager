@@ -1,0 +1,1847 @@
+#!/usr/bin/env python 
+#
+# QA check script.
+#
+# Input a bug id, and it downloads the SRPM and checks it. 
+# See --help for more info
+#
+# Created Mar 8 2004 by Erik S. LaBianca <erik[AT]ilsw.com>
+# Modified by Aurelien Bompard <gauret[AT]free.fr>
+# Mostly rewritten in September 2005 by Aurelien Bompard for Fedora Extras
+#
+# License: GPL
+#
+
+# TODO: Packaging/Guidelines#FileDeps
+#       Check that all files are UTF-8 encoded
+#       Packaging/Conflicts
+
+version = "$Rev: 181 $"[6:-2]
+
+REQUIRES = ["/usr/bin/mock", "/usr/bin/less", "/usr/bin/diff", "/usr/bin/rpmlint",
+            "/usr/bin/desktop-file-validate" ]
+
+GUIDELINES = [ { "name": "Guidelines", 
+                 "version": 119 },
+               { "name": "ReviewGuidelines", 
+                 "version": 52 },
+             ]
+
+SELF_URL = "http://gauret.free.fr/fichiers/rpms/fedora/fedora-qa"
+
+import sys
+try:
+    import re
+    import os.path
+    import commands
+    import rpm
+    import rpmUtils
+    import getopt
+    import urlgrabber
+    import urlgrabber.progress
+    import md5
+    import xml
+    from xml.dom import minidom
+    import ConfigParser
+    import yum
+    import glob
+    import stat
+except ImportError, e:
+    print "ERROR importing a module:"
+    print e
+    sys.exit(1)
+except KeyboardInterrupt:
+    print "Interrupted by user"
+    sys.exit(1)
+
+
+###########################
+
+# General functions
+
+class QAError(Exception): pass
+
+
+def pr(text, debug_text=1):
+    """print function taking debug mode into account"""
+    if debug == 0:
+        return
+    elif debug >= debug_text:
+        print text
+
+def parse_options():
+    '''Parses command line options with getopts and returns a tuple'''
+    shortOpts = "dhiulc:bov"
+    longOpts = ["debug", "help", "livna", "usage", "list", "check=", "build", "local", "version"]
+    try:
+        optlist, args = getopt.gnu_getopt(sys.argv[1:], shortOpts, longOpts)
+    except getopt.GetoptError, e:
+        print "You asked for an invalid option:"
+        print e
+        print
+        print_usage()
+    debug = 1
+    bugID = 0
+    origin = "fedora"
+    do_checks = []
+    local = False
+    for opt, arg in optlist:
+        if opt == "-d" or opt == "--debug":
+            debug = 2
+        elif opt == "-h" or opt == "--help" \
+          or opt == "-u" or opt == "--usage":
+            print_usage()
+        elif opt == "-i" or opt == "--livna":
+            origin = "livna"
+        elif opt == "-l" or opt == "--list":
+            for check in list_checks():
+                print "%s : %s" % (check, getattr(eval(check),"__doc__"))
+            sys.exit(0)
+        elif opt == "-c" or opt == "--check":
+            do_checks = arg.split(",")
+        elif opt == "-b" or opt == "--build":
+            add_check = False
+            for check in list_checks():
+                if check == "CheckBuildMock":
+                    add_check = True
+                if add_check:
+                    do_checks.append(check)
+        elif opt == "-o" or opt == "--local":
+            local = True
+        elif opt == "-v" or opt == "--version":
+            print "%s version %s" % (os.path.basename(sys.argv[0]), version)
+            sys.exit(0)
+    if len(args) != 1:
+        print_usage()
+    else:
+        arg = args[0]
+    return (arg, origin, debug, do_checks, local)
+
+def print_usage():
+    scriptName = os.path.basename(sys.argv[0])
+    print """Description of %s:
+Starts the Fedora QA process by downloading the most recent SRPM from bugzilla,
+and doing most of the QA checks automatically.
+
+Usage:
+ %s [options] [bugzilla_bug_id | srpm_filename]
+
+Options:
+ -d, --debug  .................... debug mode
+ -l, --list   .................... list all available checks
+ -c <check>, --check=<check>  .... only run the specified check
+ -b, --build  .................... only run the build and the following checks
+ -i, --livna  .................... process a livna package
+ -o, --local  .................... use the local files (don't download anything)
+ -h, --help  ..................... this help message
+ -u, --usage  .................... this help message
+ -v, --version  .................. print the version
+""" % (scriptName, scriptName)
+    sys.exit(1)
+
+def list_checks():
+    """Lists available checks"""
+    checks = []
+    for name in globals().keys():
+        if type(eval(name)) == type(QACheck) and issubclass(eval(name), QACheck) and name != "QACheck":
+            checks.append(name)
+    checks.sort(lambda x,y: cmp(eval(x).order, eval(y).order))
+    return checks
+
+def check_requires(requires_list):
+    for file in requires_list:
+        if not os.path.exists(file):
+            print "ERROR ! Missing dependency: "+file
+            sys.exit(1)
+
+def parse_config():
+    conffilepath = "%s/.fedora-qa" % os.getenv("HOME")
+    if not os.path.exists(conffilepath):
+        conffile = open(conffilepath, "w")
+        conffile.write("[DEFAULTS]\nreportsdir = ~/reports\n")
+        conffile.close()
+    confparser = ConfigParser.ConfigParser()
+    confparser.read(conffilepath)
+    conf = {}
+    for name, value in confparser.items("DEFAULTS"):
+        conf[name] = os.path.expanduser(value)
+    return conf
+
+def check_guidelines(pages):
+    '''Checks if the guidelines have changed, and warn about it'''
+    baseurl = "http://fedoraproject.org/wiki/Packaging/"
+    for page in pages:
+        try:
+            data = urlgrabber.urlread("%s%s?action=info" % (baseurl, page["name"]))
+            #version_list = re.compile('\n<tr>  <td>([0-9]+)</td>\n  <td>[0-9: -]{19}</td>\n  <td>[0-9]+</td>\n').findall(data)
+            version_list = re.compile('\n<tr>  <td>([0-9]+)</td>\n').findall(data)
+        except urlgrabber.grabber.URLGrabError:
+            version_list = []
+        if version_list == []:
+            print "Warning: I can't check if the wiki page %s has changed" % page["name"]
+            continue
+        version = version_list[0] # First version number in page -> last version of the page
+        if not version:
+            print "Warning: I can't check if the wiki page %s has changed" % page["name"]
+            return
+        if int(version) > page["version"]:
+            print "Warning: the guidelines have changed !"
+            print "Please check what changed in the following page:"
+            print baseurl+page["name"]
+            print "since revision %s, or get an updated version of this script from:" % page["version"]
+            print SELF_URL
+
+
+############################
+############################
+
+class QAPackageError(QAError): pass
+
+# Class for the src.rpm
+
+class QAPackage:
+    """This object is a package to run the QA tests on
+       The constructor takes the filename as its argument"""
+
+    sources = {}
+    patches = {}
+    sourceMd5 = {}
+    sourcedir = ""
+    rpmfilenames = []
+    needswork = []
+    passed = []
+    info = []
+    checklist = []
+    hdr = None
+    spec = None
+    total_checks = 0
+
+    def __init__(self, filename, origin="fedora", reportDir=""):
+        self.filename = filename
+        if not os.path.exists(filename):
+            raise QAPackageError("no such SRPM")
+        self.origin = origin
+        pr("Setting srpm variables", 2)
+        self.set_srpm_variables()
+        # create dir for reports
+        if reportDir == "":
+            self.reportDir = "reports/"+self.name
+        else:
+            self.reportDir = reportDir+"/"+self.name
+        if not os.path.exists(self.reportDir):
+            os.makedirs(self.reportDir)
+        self.notes = os.path.join(self.reportDir, "notes")
+        if not os.path.exists(self.notes):
+            notes = open(self.notes, "w")
+            notes.write("Notes:\n\n")
+            notes.close()
+
+    def set_srpm_variables(self):
+        '''get the rpm variables from the srpm'''
+        # set specfile
+        ts = rpm.ts("", rpm._RPMVSF_NOSIGNATURES)
+        self.hdr = rpmUtils.miscutils.hdrFromPackage(ts, self.filename)
+        filelist = self.hdr[rpm.RPMTAG_FILENAMES]
+        fileflags = self.hdr[rpm.RPMTAG_FILEFLAGS]
+        try:
+            specfile = filelist[ fileflags.index(32) ]
+        except ValueError:
+            raise QAPackageError("ERROR: Didn't find spec file !")
+        specdir = commands.getoutput('rpm -q --qf "$(rpm -E %%{_specdir})" --nosignature -p %s 2>/dev/null' % self.filename)
+        self.specfile = os.path.join(specdir, specfile)
+        pr("Specfile found: %s" % self.specfile, 2)
+        # set tags
+        fedoraver = commands.getoutput('rpm -q --qf "%{version}" fedora-release')
+        naevr = rpmUtils.miscutils.pkgTupleFromHeader(self.hdr)
+        self.name = naevr[0]
+        self.version = naevr[3]
+        self.arch = naevr[1]
+        self.epoch = naevr[2]
+        self.release = naevr[4]
+        # arch is noarch or default buildarch
+        buildarch = commands.getoutput('rpm --eval "%_arch"')
+        if self.arch != "noarch":
+            self.arch = buildarch
+        # set paths
+        # do as specdir, if sourcedir contains %name...
+        self.sourcedir = commands.getoutput('rpm -q  --qf "$(rpm -E %%{_sourcedir})" --nosignature -p %s 2>/dev/null' % self.filename)
+        # extract specfile
+        os.system('rpm2cpio %s | cpio --quiet -i %s 2>/dev/null' % (self.filename, specfile))
+        # extracts sources and URLs from the spec file
+        self.spec = ts.parseSpec(specfile)
+        sourceList = self.spec.sources()
+        for (name, id, type) in sourceList:
+            if type == 1: # Source
+                self.sources[id] = name
+            elif type == 2: # Patch
+                self.patches[id] = name
+        # Get the list of binary rpms from the specfile - does not always work, see php-extras package
+        #rpmFileList = commands.getoutput('rpm -q --define "dist .fc%s" ' % fedoraver \
+        #                +'--qf "%%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm\n" --specfile %s' % specfile).split('\n')
+        #for file in rpmFileList:
+        #    if not file.startswith(self.name+"-debuginfo"):
+        #        self.rpmfilenames.append(file)
+        # remove extracted specfile
+        os.remove(specfile)
+
+
+    def rpmEval(self, text):
+        '''Evaluate a variable with rpm's variables set and returns it'''
+        command = "rpmbuild -bp --nodeps --force --define '__spec_prep_pre echo %s; exit 0' --define 'setup :' %s | tail -n 1" % (text, self.specfile)
+        return commands.getoutput(command)
+
+    def installSRPM(self):
+        '''installs the SRPM on the system, and backs up the old spec file if it exists'''
+        if os.path.exists(self.specfile):
+            os.rename(self.specfile, self.specfile+".old")
+        installStatus, installOutput = commands.getstatusoutput('rpm --nosignature -i %s' % (self.filename))
+        if installStatus > 0:
+            raise QAPackageError("ERROR: Unable to install SRPM: %s" % installOutput)
+
+    def getReleaseFromSpec(self):
+        '''Call rpm on the specfile to get the dist tag right on the release tag. Can only be done after install'''
+        self.release = commands.getoutput('rpm -q --qf "%%{R}\n" --nosignature --specfile %s 2>/dev/null | head -1' % self.specfile)
+
+    def setChecks(self, list):
+        self.checklist = list
+
+    def addCheck(self, check):
+        self.checklist.append(check)
+
+    def getReport(self, printonly=False):
+        '''Print out the QA report'''
+        report = "Review for release %s:\n" % self.release
+        for item in self.passed:
+            report += "* %s\n" % item
+        report += "* INSERT RESULT OF RUN TEST\n"
+        if self.needswork != []:
+            report += "\nNeeds work:\n"
+            for item in self.needswork:
+                report += "* %s\n" % item
+        if self.info != []:
+            report += "\nMinor:\n"
+            for item in self.info:
+                report += "* %s\n" % item
+        report += "\n(%s checks have been run)\n" % self.total_checks
+        report += "\n\n"
+        notesFD = open(self.notes, "r")
+        report += notesFD.read()
+        notesFD.close()
+        return report
+
+    def printReport(self):
+        """Prints the report to stdout"""
+        report = self.getReport()
+        pr("----------------------------------------")
+        pr(report)
+        pr("----------------------------------------")
+        pr('All files can be found in the "%s" directory' % self.reportDir)
+        pr('The spec file is "%s"' % self.specfile)
+
+    def saveReport(self):
+        """Saves the report to the reportDir"""
+        report = self.getReport()
+        reportFD = open(os.path.join(self.reportDir, "report"), "w")
+        reportFD.write(report)
+        reportFD.close()
+
+    def runChecks(self):
+        pr("Checking %s, version %s, release %s..." % (self.name, self.version, self.release))
+        self.checklist.sort()
+        for check_item in self.checklist:
+            check_item.check()
+
+
+
+##########################
+
+# Test Class :
+
+class QACheck:
+
+    target = None
+    order = 0
+    editor = "vim -o" # Vim in multiwindow mode. Use "Ctrl+W +" to enlarge the current window
+
+    def __init__(self, target):
+        """Needs a QAPackage as argument: the package to test on"""
+        self.target = target
+        if os.environ.has_key("EDITOR"):
+            self.editor = os.environ["EDITOR"]
+
+    def __cmp__(self, other):
+        if other.order > self.order:
+            return -1
+        elif other.order == self.order:
+            return 0
+        elif other.order < self.order:
+            return 1
+
+    def has_passed(self, message):
+        """ The test passed """
+        self.target.passed.append(message)
+
+    def has_failed(self, message, severity="needswork"):
+        """ The test failed """
+        pr(message)
+        if severity == "info":
+            self.target.info.append(message)
+        else:
+            self.target.needswork.append(message)
+
+    def approve(self, testname):
+        """asks the user if he likes what he sees, and if not, generate a needswork review"""
+        pr(testname+": is it OK ? (press Enter if yes, or else type your comment below)")
+        answer = raw_input().strip()
+        if answer == "":
+            self.has_passed(testname+" looks OK")
+        else:
+            self.has_failed(testname+": "+answer)
+
+    def ask(self, prompt, default="y"):
+        """asks a question and returns true or false"""
+        if default == "y":
+            choice = " ([y]/n)"
+        else:
+            choice = " (y/[n])"
+        print prompt+choice
+        answer = raw_input().strip()
+        if (default == "y" and answer != "n") or answer == "y":
+            return 1
+        else:
+            return 0
+
+    def check_built(self):
+        """Checks that the binary rpm is built."""
+        files = "%s/*-%s-%s*.%s.rpm" % (self.target.reportDir, self.target.version, 
+                                        self.target.release, self.target.arch)
+        rpms_list = glob.glob(files)
+        rpms_list = [ os.path.basename(r) for r in rpms_list ]
+        if not rpms_list:
+            pr("Binary package is not built yet")
+            #print files
+            return False
+        else:
+            self.target.rpmfilenames = rpms_list
+            return True
+
+    def check(self):
+        """main checking function, to be redefined by subclasses"""
+        self.target.total_checks += 1
+        pass
+
+
+##########################
+# Checks
+
+class CheckName(QACheck):
+    """ask the user if the name-version-release is correct"""
+
+    order = 10
+
+    def check(self):
+        pr("Checking name", 2)
+        message_failed = "Package does not follow Fedora's package naming guildlines\n  (wiki: PackageNamingGuidelines)"
+        if self.target.origin == "livna":
+            ext = ".lvn."
+        else:
+            ext = ""
+        if self.target.release.count(ext) == 0:
+            self.has_failed(message_failed)
+            return
+        version_regexp = re.compile(r"""^
+            [\d\.]+     # version number
+            ([a-z]+)?   # optional tag for quick bugfix release
+            $""", re.VERBOSE)
+        release_regexp = re.compile(r"""^
+            (           # Either normal release tag, or non-numeric (pre-releases, snapshots)
+            [1-9]+\d*   # normal release number, to be incremented. Does not start with 0
+            |           # now come the non-numeric cases
+            0\.         # pre-release: prefix with 0
+            [1-9]+\d*   # release number, to be incremented. Does not start with 0
+            \.\w+       # alphatag or snapshot tag
+            )           # end of the non-numeric cases
+            (\.fc\d+    # dist tag
+            (\.\d+)?    # minor release bumps for old branches
+            )?          # the dist tag is optional, and minor release bumps for old branches may only be used if dist tag is used
+            $""", re.VERBOSE)
+        # tested with: all examples on the PackageNamingGuidelines, plus:
+        #   "1" (good), 
+        #   "1.fc6" (good), 
+        #   "0.1.a" (good), 
+        #   "0.2a" (bad, "a" should be after a dot),
+        #   "1.fc6.1" (good, branch-specific bump)
+        #   "1.1" (bad, branch-specific bump without the dist tag)
+
+        version_match = version_regexp.match(self.target.version)
+        release_match = release_regexp.match(self.target.release)
+        question = "Are the name, version and release correct according to Fedora's package naming guidelines " \
+                  +"(http://fedoraproject.org/wiki/Packaging/NamingGuidelines)"
+        if version_match and release_match:
+            question += "\n(looks good to my automatic check)"
+        else:
+            question += "\n(looks wrong to my automatic check)"
+        answer = self.ask(question)
+        if answer == 1:
+            self.has_passed("RPM name is OK")
+        else:
+            self.has_failed(message_failed)
+        self.target.total_checks += 1
+
+
+class CheckSpecDiff(QACheck):
+    """diff the spec files in case of update"""
+
+    order = 20
+
+    def check(self):
+        pr("Checking spec diff", 2)
+        if os.path.exists(self.target.specfile+".old"):
+            diff = commands.getoutput('diff -bu "%s.old" "%s"' % (self.target.specfile, self.target.specfile))
+            diffFilePath = os.path.join(self.target.reportDir,"spec.diff")
+            if diff == "":
+                pr("The spec file didn't change", 2)
+                if os.path.exists(diffFilePath):
+                    if self.ask("View the last spec diff ?"):
+                        os.system('%s "%s" "%s"' % (self.editor, diffFilePath, self.target.notes))
+            else:
+                diffFd = open(diffFilePath, "w")
+                diffFd.write(diff)
+                diffFd.close()
+                if self.ask("Diff the spec files ?"):
+                    os.system('%s "%s" "%s"' % (self.editor, diffFilePath, self.target.notes))
+
+
+class CheckSources(QACheck):
+    """check upstream sources: returns a list of lines for the report"""
+
+    order = 30
+
+    def check(self):
+        pr("Checking upstream sources", 2)
+        for (sourceId, sourceUrl) in self.target.sources.iteritems():
+            sourceFileName = os.path.basename(sourceUrl)
+            if sourceUrl.count('tp://') == 0 and sourceUrl.count('https://') == 0:
+                if self.ask("Source %s is not downloadable (%s). View it in 'less' ?" % (sourceId, sourceUrl)):
+                    os.system('less "%s"' % self.target.sourcedir+"/"+sourceFileName)
+            else:
+                pr("Checking source %s" % sourceId)
+                if os.path.exists(sourceFileName):
+                    pr("Using already downloaded source", 2)
+                else:
+                    pr("Downloading source from %s" % sourceUrl, 2)
+                    try:
+                        urlgrabber.urlgrab(sourceUrl, reget='check_timestamp', progress_obj=urlgrabber.progress.TextMeter(fo=sys.stdout))
+                    except urlgrabber.grabber.URLGrabError, e:
+                        self.has_failed("Source %s is not available (%s)\n  (wiki: QAChecklist item 2)" % (sourceId, sourceUrl))
+                        pr(e, 2)
+                        continue
+                if os.path.exists(sourceFileName):
+                    upstream_file = open(sourceFileName, "r")
+                    upstream_md5 = md5.new(upstream_file.read()).hexdigest()
+                    upstream_file.close()
+                    local_file = open(self.target.sourcedir+"/"+sourceFileName, "r")
+                    local_md5 = md5.new(local_file.read()).hexdigest()
+                    if upstream_md5 == local_md5:
+                        self.has_passed("Source %s is the same as upstream" % sourceFileName)
+                    else:
+                        self.has_failed("Source "+sourceFileName+" is different from upstream\n  (wiki: QAChecklist item 2)")
+        self.target.total_checks += 1
+
+
+class CheckPatches(QACheck):
+    """checks the patches in the srpm"""
+
+    order = 40
+
+    def check(self):
+        pr("Checking patches", 2)
+        if not self.target.patches:
+            return
+        pr("Patches found: %s." % ", ".join(self.target.patches.values()) )
+        if self.ask("Look at the patches ?"):
+            for (patchId, patchName) in self.target.patches.iteritems():
+                os.system('%s "%s" "%s"' % (self.editor, self.target.sourcedir+"/"+os.path.basename(patchName), self.target.notes))
+        self.target.total_checks += 1
+
+
+class CheckBRConsistency(QACheck):
+    """Checks that only one of $RPM_BUILD_ROOT or %{buildroot} is used"""
+
+    order = 50
+
+    def check(self):
+        pr("Checking BuildRoot Consistency", 2)
+# TODO: do it in python with re
+        use_shell = 0
+        use_macro = 0
+        status, output = commands.getstatusoutput("grep -qs '\$RPM_BUILD_ROOT' %s" % self.target.specfile)
+        if status == 0:
+            use_shell = 1
+        status, output = commands.getstatusoutput("egrep -qs '%%\{?buildroot\}?' %s" % self.target.specfile)
+        if status == 0:
+            use_macro = 1
+        if use_shell and use_macro:
+            self.has_failed("Use of buildroot is not consistant\n  (wiki: Packaging/Guidelines#UsingBuildRootOptFlags)")
+        self.target.total_checks += 1
+
+
+class CheckBuildRoot(QACheck):
+    """Checks that the BuildRoot is the Fedora-preferred one"""
+
+    order = 60
+
+    def check(self):
+        pr("Checking buildroot", 2)
+        buildroot = self.target.spec.buildRoot()
+        preferred_br_tag = "%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)"
+        preferred_br = self.target.rpmEval(preferred_br_tag)
+        if buildroot != preferred_br:
+            self.has_failed("BuildRoot should be "+preferred_br_tag+"\n  (wiki: Packaging/Guidelines#BuildRoot)")
+        self.target.total_checks += 1
+
+
+class CheckDFU(QACheck):
+    """Checks that the desktop-file-utils is required if desktop-file-install is used"""
+
+    order = 70
+
+    def check(self):
+        pr("Checking desktop-file-utils", 2)
+        try:
+            install = self.target.spec.install()
+        except SystemError:
+            self.has_failed("There is no %install section")
+            return
+        if install.count("desktop-file-install") == 0:
+            return
+        buildrequires = self.target.hdr[rpm.RPMTAG_REQUIRES]
+        if "desktop-file-utils" not in buildrequires:
+            self.has_failed("BuildRequires: desktop-file-utils is missing")
+        self.target.total_checks += 1
+
+
+class CheckBRExceptions(QACheck):
+    """Checks that the package does not have excluded BuildRequires"""
+
+    order = 80
+
+    def check(self):
+        pr("Checking buildrequires exceptions", 2)
+        # Try getting the list from the wiki
+        try:
+            data = urlgrabber.urlread("http://fedoraproject.org/wiki/Extras/FullExceptionList")
+            # Parse the HTML page
+            regexp = re.compile('''<pre>([\w+\n-]+)</pre>''')
+            br_exceptions = regexp.findall(data)
+            if len(br_exceptions) > 0: # If the format changed and the regexp fails
+                br_exceptions = br_exceptions[0].strip().split("\n")
+        except urlgrabber.grabber.URLGrabError:
+            br_exceptions = []
+
+        if br_exceptions == []:
+            # if it failed, use this list (from http://fedoraproject.org/wiki/Packaging/Guidelines#Exceptions)
+            br_exceptions = ["bash", "bzip2", "coreutils", "cpio", "diffutils", "fedora-release", 
+                             "findutils", "gawk", "gcc", "gcc-c++", "grep", "gzip", "info", "make", "patch", 
+                             "rpm-build", "redhat-rpm-config", "sed", "tar", "unzip", "util-linux-ng", "which",]
+
+        buildrequires = self.target.hdr[rpm.RPMTAG_REQUIRES]
+        for br in buildrequires:
+            if br in br_exceptions:
+                self.has_failed("BuildRequires: %s should not be included\n  (wiki: Packaging/Guidelines#Exceptions)" % br)
+        self.target.total_checks += 1
+
+
+class CheckEncoding(QACheck):
+    """Checks that the spec file is in ASCII or UTF-8"""
+
+    order = 90
+
+    def check(self):
+        pr("Checking encoding", 2)
+        spec = open(self.target.specfile, "r")
+        spectext = spec.read()
+        spec.close()
+        enc_ok = False
+        for enc in ["utf-8", "ascii"]:
+            try:
+                unicode(spectext, enc, "strict")
+            except ValueError:
+                pass
+            else:
+                enc_ok = True
+                break
+        if not enc_ok:
+            self.has_failed("Encoding should be UTF-8")
+        self.target.total_checks += 1
+
+
+class CheckSpecName(QACheck):
+    """Checks that the spec filename is %{name}.spec"""
+
+    order = 100
+
+    def check(self):
+        pr("Checking spec name", 2)
+        specfile = os.path.basename(self.target.specfile)
+        if not specfile == "%s.spec" % self.target.name:
+            self.has_failed("Specfile should be in the format %{name}.spec\n  (wiki: Packaging/ReviewGuidelines)")
+        self.target.total_checks += 1
+
+
+class CheckSMPFlags(QACheck):
+    """Checks that the smp flags are set for make"""
+
+    order = 110
+
+    def check(self):
+        pr("Checking SMP flags", 2)
+        try:
+            buildscript = self.target.spec.build()
+        except SystemError, e: # No build script
+            return
+        if self.target.arch == "noarch" or buildscript.count("make") == 0:
+            return
+        if buildscript.count(self.target.rpmEval("%{_smp_mflags}")) == 0:
+            self.has_failed("Missing SMP flags. If it doesn't build with it, please add a comment\n  (wiki: Packaging/Guidelines#parallelmake)")
+        self.target.total_checks += 1
+
+
+class CheckQTEnvVars(QACheck):
+    """Checks that the QT environment variables are set"""
+
+    order = 120
+
+    def check(self):
+        pr("Checking QT env vars", 2)
+        buildrequires = self.target.hdr[rpm.RPMTAG_REQUIRES]
+        #buildrequires = commands.getoutput("rpm -qpR --nosignature %s" % self.target.filename)
+        #if buildrequires.count("qt-devel") == 0 and buildrequires.count("kde") == 0:
+        needs_qt = False
+        for br in buildrequires:
+            if br == "qt-devel":
+                needs_qt = True
+            if br.startswith("kde") and br.endswith("-devel"):
+                needs_qt = True
+        if not needs_qt:
+            return
+        buildscript = self.target.spec.build()
+        if buildscript.count("unset QTDIR") == 0 and buildscript.count(". /etc/profile.d/qt.sh") == 0:
+            self.has_failed("QT environment variable are not sourced", "info")
+        self.target.total_checks += 1
+
+
+class CheckRelocatable(QACheck):
+    """Checks that the package is not marked Relocatable"""
+
+    order = 130
+
+    def check(self):
+        pr("Checking relocatable instruction", 2)
+        spec = open(self.target.specfile, "r")
+        for line in spec:
+            if line.startswith("Prefix:") > 0:
+                self.has_failed("Package is marked as relocatable, please check.\n  (wiki: Packaging/Guidelines#RelocatablePackages)")
+                spec.close()
+                return
+        spec.close()
+        self.target.total_checks += 1
+
+
+class CheckClean(QACheck):
+    """Checks that the specfile contains a proper %%clean section"""
+
+    order = 140
+
+    def check(self):
+        pr("Checking %%clean", 2)
+        message = "there must be a proper %clean section\n  (wiki: Packaging/ReviewGuidelines)"
+        buildroot = self.target.spec.buildRoot()
+        try:
+            clean = self.target.spec.clean()
+        except SystemError:
+            self.has_failed(message)
+            return
+        if clean.count(buildroot) == 0 and clean.count("$RPM_BUILD_ROOT") == 0:
+            self.has_failed(message)
+        self.target.total_checks += 1
+
+
+class CheckBRDuplicates(QACheck):
+    """Checks that the package does not have duplicate BuildRequires"""
+
+    order = 150
+
+    buildrequires_clean = []
+    already_required = []
+
+    class YumBaseNoLog(yum.YumBase):
+        def log(self, level, msg):
+            pass
+
+    def check_br(self, pkgname):
+        exact,match,unmatch = yum.packages.parsePackages(self.repoq.pkgSack.returnNewestByNameArch(), [pkgname], casematch=1)
+        if not exact:
+            return
+        requires = exact[0].requiresList()
+        for req in requires:
+            if req.count("rpmlib") > 0:
+                continue # filter out rpmlib deps
+            if req.count(" ") > 0:
+                req = req.split(" ")[0] # versioned dependency
+            if req in self.buildrequires_clean:
+                pr("found duplicate: "+req, 2)
+                self.buildrequires_clean.remove(req)
+                self.already_required.append( (req, pkgname) )
+            #self.check_br(req) # Check recursively. Maybe a little overkill...
+
+    def check(self):
+        pr("Checking for duplicate buildrequires", 2)
+        buildrequires = self.target.hdr[rpm.RPMTAG_REQUIRES]
+        buildrequires = [br for br in buildrequires if br.count("rpmlib") == 0] # filter out rpmlib dependency
+        if len(buildrequires) < 2:
+            return
+        if not self.ask("Check for duplicate BuildRequires ? (may be long, %s of them)" % len(buildrequires), "n"):
+            return
+        self.buildrequires_clean = buildrequires[:]
+        self.repoq = self.YumBaseNoLog()
+        self.repoq.doConfigSetup()
+        cachedir = yum.misc.getCacheDir()
+        if cachedir is None:
+            pr("Error: could not make cachedir, aborting test.")
+            return
+        self.repoq.repos.setCacheDir(cachedir)
+        pr("setting up repositories...")
+        self.repoq.doRepoSetup()
+        try:
+            self.repoq.doSackSetup()
+            self.repoq.doTsSetup()
+        except yum.Errors.RepoError, e:
+            pr(e)
+            pr("Error, aborting test.")
+            return
+        pr("checking buildrequires...")
+        for br in buildrequires:
+            sys.stdout.write("\r[%s/%s]" % (buildrequires.index(br)+1, len(buildrequires)))
+            sys.stdout.flush()
+            self.check_br(br)
+        sys.stdout.write("\r")
+        sys.stdout.flush()
+        if self.already_required:
+            message = "Duplicate BuildRequires: "
+            for buildreq, by in self.already_required:
+                message += "%s (by %s), " % (buildreq, by)
+            self.has_failed(message[:-2], "info")
+        self.target.total_checks += 1
+
+
+class CheckRPMMacros(QACheck):
+    """Checks that paths are replaced with RPM macros"""
+
+    order = 160
+
+    def check(self):
+        pr("Checking rpmmacros", 2)
+        spec = open(self.target.specfile, "r")
+        for line in spec:
+            if line.count("/usr") > 0 or line.count("/var") > 0:
+                self.has_failed("Spec file: some paths are not replaced with RPM macros\n  (wiki: Packaging/Guidelines#macros)")
+                spec.close()
+                return
+            if line.startswith("%changelog"):
+                break
+        spec.close()
+        self.target.total_checks += 1
+
+
+class CheckRequiresPrePost(QACheck):
+    """Checks that the form "Requires(pre,post)" is not used"""
+
+    order = 170
+
+    def check(self):
+        pr("Checking Requires(pre,post,...)", 2)
+        spec = open(self.target.specfile, "r")
+        expr = re.compile("^Requires\([\w\s]+,[\w\s]+(,[\w\s]+)*\):.*")
+        for line in spec:
+            if expr.match(line):
+                self.has_failed("Spec file: the \"Requires(*.*)\" notation should be split\n  (wiki: Packaging/Guidelines#reqprepost)")
+                spec.close()
+                return
+        spec.close()
+        self.target.total_checks += 1
+
+
+class CheckLatestVersion(QACheck):
+    """Checks that the package uses the latest version"""
+
+    order = 180
+
+    def fmcheck(self, xmlpage):
+        """Do the check on freshmeat"""
+        xmldoc = minidom.parse(xmlpage)
+        lastversion_node = xmldoc.getElementsByTagName('latest_release_version')[0].firstChild
+        if not lastversion_node:
+            return None
+        lastversion = xmldoc.getElementsByTagName('latest_release_version')[0].firstChild.data
+        return lastversion
+
+    def check(self):
+        pr("Checking for the latest version", 2)
+        url = "http://freshmeat.net/projects-xml/%(name)s/%(name)s.xml" % {"name": self.target.name}
+        try:
+            xmlpage = urlgrabber.urlopen(url)
+        except urlgrabber.grabber.URLGrabError, e:
+            pr("Can't access Freshmeat, aborting test")
+            return
+        try:
+            lastversion = self.fmcheck(xmlpage)
+        except xml.parsers.expat.ExpatError:
+            pr("Project not found on Freshmeat. Please enter the project's Freshmeat name (or press Enter to abort):")
+            answer = raw_input().strip()
+            if not answer:
+                pr("Aborting test")
+                return
+            url = "http://freshmeat.net/projects-xml/%(name)s/%(name)s.xml" % {"name": answer}
+            xmlpage = urlgrabber.urlopen(url)
+            try:
+                lastversion = self.fmcheck(xmlpage)
+            except xml.parsers.expat.ExpatError:
+                pr("Project still not found. Aborting test.")
+                return
+        if lastversion is None:
+            pr("The Freshmeat page does not have version information, aborting.")
+            return
+        if lastversion != self.target.version:
+            answer = self.ask("According to Freshmeat, the latest version is %s.\n" % lastversion +\
+                              "Is this package using the latest version ?")
+            if answer != 1:
+                self.has_failed("The latest version is %s. Please update" % lastversion, "info")
+            else:
+                self.has_passed("This is the latest version")
+        else:
+            self.has_passed("This is the latest version")
+        self.target.total_checks += 1
+
+
+class CheckForbiddenTag(QACheck):
+    """Checks that the package does not contain forbidden tags"""
+
+    order = 190
+
+    def check(self):
+        pr("Checking for forbidden tag", 2)
+        spec = open(self.target.specfile, "r")
+        for line in spec:
+            for tag in ["Vendor", "Packager", "Copyright"]:
+                if line.startswith(tag+":"):
+                    self.has_failed("Spec file: tag %s is forbidden\n  (wiki: Packaging/Guidelines#tags)" % tag)
+        spec.close()
+        self.target.total_checks += 1
+
+
+class CheckDownloadableSource(QACheck):
+    """checks if at least one of the source is an URL"""
+
+    order = 200
+
+    def check(self):
+        pr("Checking for downloadable sources", 2)
+        for (sourceId, sourceUrl) in self.target.sources.iteritems():
+            if sourceUrl.count('tp://') > 0:
+                return
+        self.has_failed("No downloadable source. Please give the full URL in the Source tag.")
+        self.target.total_checks += 1
+
+
+class CheckCleanBRInInstall(QACheck):
+    """Checks that the specfile cleans the BuildRoot in %install"""
+
+    order = 210
+
+    def check(self):
+        pr("Checking for BR cleaning in %install", 2)
+        message = "The BuildRoot must be cleaned at the beginning of %install"
+        buildroot = self.target.spec.buildRoot()
+        try:
+            install = self.target.spec.install().split("\n")
+        except SystemError:
+            self.has_failed("There is no %install section")
+            return
+        self.target.total_checks += 1
+        expr = re.compile("^(/bin/)?rm -(rf|fr) (\$RPM_BUILD_ROOT|%s)" % buildroot)
+        for line in install:
+            if expr.match(line):
+                return
+        self.has_failed(message)
+
+
+class CheckFindLangGettext(QACheck):
+    """Checks that gettext is Required if the %find_lang macro is used"""
+
+    order = 220
+
+    def check(self):
+        pr("Checking translations requirement", 2)
+        try:
+            install = self.target.spec.install()
+        except SystemError:
+            self.has_failed("There is no %install section")
+            return
+        if install.count("/usr/lib/rpm/redhat/find-lang.sh") == 0:
+            return
+        buildrequires = self.target.hdr[rpm.RPMTAG_REQUIRES]
+        if "gettext" not in buildrequires:
+            self.has_failed("BuildRequires: gettext is missing (required to build the translations)")
+        self.target.total_checks += 1
+
+
+class CheckNoarch(QACheck):
+    """checks if the package is improperly built for noarch"""
+
+    order = 230
+
+    def check(self):
+        if not self.target.arch == "noarch":
+            return
+        pr("Checking invalid use of noarch", 2)
+        spec = open(self.target.specfile, "r")
+        for line in spec:
+            if line.count("%_libdir") > 0 or line.count("%{_libdir}") > 0:
+                self.has_failed("The package cannot be noarch since it installs files to %{_libdir}")
+                spec.close()
+                return
+            if line.startswith("%changelog"):
+                break
+        spec.close()
+        self.target.total_checks += 1
+
+
+class CheckMakeInstallMacro(QACheck):
+    """Checks that the %makeinstall macro is not used"""
+
+    order = 240
+
+    def check(self):
+        pr("Checking for the %makeinstall macro", 2)
+        spec = open(self.target.specfile, "r")
+        for line in spec:
+            if line.count("%makeinstall") > 0 or line.count("%{makeinstall}") > 0:
+                self.has_failed("The %makeinstall macro should not be used\n  (wiki: Packaging/Guidelines#MakeInstall)")
+                spec.close()
+                return
+            if line.startswith("%changelog"):
+                break
+        spec.close()
+        self.target.total_checks += 1
+
+
+class CheckGhostPyo(QACheck):
+    """checks if the *.pyo files are %%ghost'ed"""
+
+    order = 250
+
+    def check(self):
+        pr("Checking ghosting of *.pyo files", 2)
+        spec = open(self.target.specfile, "r")
+        for line in spec:
+            if line.startswith("%ghost") and line.endswith(".pyo"):
+                self.has_failed("The .pyo files should not be %%ghost'ed\n (wiki: Packaging/Python#pyos)")
+                spec.close()
+                return
+            if line.startswith("%changelog"):
+                break
+        spec.close()
+        self.target.total_checks += 1
+
+
+class CheckSpec(QACheck):
+    '''Just read the spec file'''
+
+    order = 980
+
+    def check(self):
+        pr("Checking spec file", 2)
+        if self.ask("Look at the spec file ?"):
+            os.system('%s "%s" "%s"' % (self.editor, self.target.specfile, self.target.notes))
+
+
+class CheckDiffTemplate(QACheck):
+    """Diff against the template for relevant packages"""
+
+    order = 990
+
+    def check(self):
+        pr("Checking diff against template", 2)
+        for template in [ "python", "perl", "ruby" ]:
+            if self.target.name.startswith("%s-" % template):
+                if self.ask("Diff against the spec template ?"):
+                    os.system('diff -bu "/usr/share/fedora/spectemplate-%s.spec" "%s" | less' % \
+                                 (template, self.target.specfile))
+
+
+class CheckBuildMock(QACheck):
+    """Builds the RPM with mock"""
+
+    order = 1000
+
+    def check(self, root="default"):
+        status, output = commands.getstatusoutput("which mock")
+        if os.WEXITSTATUS(status) == 1:
+            pr("mock is not available")
+            return
+        if not self.ask("Build the RPM in mock ?"):
+            return
+        pr("Starting build in mock")
+        command = 'mock --resultdir="%s" rebuild %s' % (self.target.reportDir, self.target.filename)
+        status = os.system(command)
+        if status > 0:
+            pr("WARNING: Build failed ! (command: %s)" % command)
+            self.has_failed("Build failed in mock")
+            pr("mock command was: '%s'" % command)
+        else:
+            self.has_passed("Builds fine in mock")
+        if self.ask("View the build log ?"):
+            rpmlog = os.path.join(self.target.reportDir, "build.log")
+            os.system('less "%s"' % rpmlog)
+        self.target.total_checks += 1
+
+
+class CheckRpmlint(QACheck):
+    """unleashes rpmlint at the srpm and the binary rpm if the build is complete"""
+
+    order = 1100
+
+    def check(self):
+        pr("Launching rpmlint")
+        status, srpmRpmlint = commands.getstatusoutput("rpmlint "+self.target.filename)
+        if os.WEXITSTATUS(status) == 127:
+            pr("WARNING: rpmlint is not available, please install it")
+            return
+        srpmRpmlintFD = open(self.target.reportDir+"/rpmlint-srpm.log", "w")
+        srpmRpmlintFD.write(srpmRpmlint)
+        srpmRpmlintFD.close()
+        pr("Source RPM:")
+        pr(srpmRpmlint)
+        if self.check_built():
+            for file in self.target.rpmfilenames:
+                filepath = self.target.reportDir+"/"+file
+                rpmRpmlint = commands.getoutput("rpmlint "+filepath)
+                rpmRpmlintFD = open(self.target.reportDir+"/rpmlint-rpm.log", "a")
+                rpmRpmlintFD.write("rpmlint of %s:" % file)
+                rpmRpmlintFD.write(rpmRpmlint)
+                rpmRpmlintFD.write("\n\n")
+                rpmRpmlintFD.close()
+                subpackage = file[:file.rindex(self.target.version)-1]
+                pr("\nrpmlint of %s:" % subpackage)
+                pr(rpmRpmlint)
+                if len(self.target.rpmfilenames) == 1:
+                    self.approve("rpmlint")
+                else:
+                    self.approve("rpmlint of "+subpackage)
+        self.target.total_checks += 1
+
+
+class CheckFiles(QACheck):
+    """checks files list and ownership"""
+
+    order = 1110
+
+    def check(self):
+        pr("Checking files", 2)
+        if not self.check_built():
+            return
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            pr("Files in package %s:" % file)
+            os.system("rpm -qplv %s | less" % filepath)
+            subpackage = file[:file.rindex(self.target.version)-1]
+            if len(self.target.rpmfilenames) == 1:
+                self.approve("File list")
+            else:
+                self.approve("File list of "+subpackage)
+
+
+class CheckDesktopFile(QACheck):
+    """checks the presence of a .desktop file if the package depends on xorg."""
+
+    order = 1120
+
+    def check(self):
+        pr("Checking desktop file", 2)
+        if not self.check_built():
+            return
+        ts = rpm.ts()
+        is_graphical = False
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            if not os.path.exists(filepath):
+                continue
+            filehdr = rpmUtils.miscutils.hdrFromPackage(ts, filepath)
+            requires = filehdr[rpm.RPMTAG_REQUIRES]
+            for r in requires:
+                if r.startswith("libX11.so."):
+                    is_graphical = True
+        if not is_graphical:
+            return
+        has_desktopfile = False
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            filehdr = rpmUtils.miscutils.hdrFromPackage(ts, filepath)
+            filelist = filehdr[rpm.RPMTAG_FILENAMES]
+            for f in filelist:
+                if f.startswith("/usr/share/applications/") and f.endswith(".desktop"):
+                    has_desktopfile = True
+        if not has_desktopfile:
+            self.has_failed("The package should contain a .desktop file\n  (wiki: Packaging/Guidelines#desktop)")
+        self.target.total_checks += 1
+
+
+class CheckLicenseFile(QACheck):
+    """checks the presence of a license file."""
+
+    order = 1130
+
+    def check(self):
+        pr("Checking license file", 2)
+        if not self.check_built():
+            return
+        ts = rpm.ts()
+        has_licensefile = False
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            if not os.path.exists(filepath):
+                continue
+            filehdr = rpmUtils.miscutils.hdrFromPackage(ts, filepath)
+            filelist = filehdr[rpm.RPMTAG_FILENAMES]
+            for f in filelist:
+                if f.startswith("/usr/share/doc/") and ( f.lower().count("license") > 0 or \
+                   f.lower().count("copying") > 0 or f.lower().count("copyright") > 0 ):
+                    has_licensefile = True
+        if not has_licensefile:
+            self.has_failed("The package should contain the text of the license\n  (wiki: Packaging/ReviewGuidelines)")
+        self.target.total_checks += 1
+
+
+class CheckFileListedTwice(QACheck):
+    """checks if a file has been listed multiple times in %%files"""
+
+    order = 1140
+
+    def check(self):
+        pr("Checking files listed multiple times", 2)
+        if not self.check_built():
+            return
+        status, output = commands.getstatusoutput("grep '^warning: File listed twice:' %s/build.log" % self.target.reportDir)
+        if status == 0:
+            self.has_failed("File list: some files were listed multiple times\n  (wiki: Packaging/ReviewGuidelines)")
+        self.target.total_checks += 1
+
+
+class CheckDefattr(QACheck):
+    """checks if all the %%files sections contain %%defattr() instructions"""
+
+    order = 1150
+
+    def check(self):
+        pr("Checking defattr", 2)
+        if not self.check_built():
+            return
+        files_num = commands.getoutput("grep '^%%files' %s | wc -l" % self.target.specfile)
+        defattr_num = commands.getoutput("grep '^%%defattr' %s | wc -l" % self.target.specfile)
+        if files_num > defattr_num:
+            self.has_failed("Each %files section should have a %defattr line\n  (wiki: Packaging/ReviewGuidelines)")
+        self.target.total_checks += 1
+
+
+class CheckLibtoolArchives(QACheck):
+    """checks the presence of a .la libtool archives"""
+
+    order = 1160
+
+    def check(self):
+        pr("Checking .la files", 2)
+        if not self.check_built():
+            return
+        ts = rpm.ts()
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            if not os.path.exists(filepath):
+                continue
+            filehdr = rpmUtils.miscutils.hdrFromPackage(ts, filepath)
+            filelist = filehdr[rpm.RPMTAG_FILENAMES]
+            for f in filelist:
+                if os.path.dirname(f) == "/usr/lib/" and f.endswith(".la"):
+                    self.has_failed("The package contains libtool archive files (*.la)\n  (wiki: Packaging/Guidelines#StaticLibraries)")
+                    return
+        self.target.total_checks += 1
+
+
+class CheckDesktopFileProperties(QACheck):
+    """checks if the desktop files are valid"""
+
+    order = 1170
+    valid_cats = None
+
+    def check_categories(self, categories):
+        if "X-Fedora" in categories:
+            self.has_failed("Desktop file: the Categories tag should not contain X-Fedora any more\n  (wiki: Packaging/Guidelines#desktop)")
+        if "Application" in categories:
+            self.has_failed("Desktop file: the Categories tag should not contain Application any more\n  (wiki: Packaging/Guidelines#desktop)")
+        # check if the category is valid
+        valid_cats_url = "http://standards.freedesktop.org/menu-spec/latest/apa.html"
+
+        # get the list of valid categories
+        if not self.valid_cats:
+            try:
+                data = urlgrabber.urlread(valid_cats_url)
+            except urlgrabber.grabber.URLGrabError:
+                return # Can't check...
+            # Parse the HTML page
+            regexp = re.compile('''<tr><td>([a-zA-Z0-9]+)</td><td>.+?</td><td(?: class="auto-generated")?>.+?</td></tr>''')
+            self.valid_cats = regexp.findall(data)
+
+        if len(self.valid_cats) == 0: # Regexp must have failed... don't check.
+            return
+        for cat in categories:
+            pr("  checking desktop files category '%s'" % cat, 2)
+            if not cat.startswith("X-") and cat not in self.valid_cats:
+                self.has_failed("Desktop file: the category %s is not valid\n  (%s)" % (cat, valid_cats_url))
+
+
+    def check(self):
+        pr("Checking desktop files validity", 2)
+        if not self.check_built():
+            return
+        ts = rpm.ts()
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            if not os.path.exists(filepath):
+                continue
+            filehdr = rpmUtils.miscutils.hdrFromPackage(ts, filepath)
+            filelist = filehdr[rpm.RPMTAG_FILENAMES]
+            desktopfiles = []
+            for f in filelist:
+                if f.startswith("/usr/share/applications/") and f.endswith(".desktop"):
+                    desktopfiles.append(f)
+            if not desktopfiles:
+                continue
+            for dfile in desktopfiles:
+
+                # Check vendor
+                if os.path.dirname(dfile).endswith("applications") and not os.path.basename(dfile).startswith("fedora"):
+                    self.has_failed("Desktop file: vendor should be fedora\n  (wiki: Packaging/Guidelines#desktop)")
+                self.target.total_checks += 1
+
+                # extract it
+                os.system('rpm2cpio %s | cpio --quiet -i -d .%s' % (filepath, dfile)) # exctract it
+
+                # Validate with desktop-file-validate
+                status, output = commands.getstatusoutput("desktop-file-validate .%s" % dfile)
+                if status != 0:
+                    self.has_failed("Desktop file: desktop-file-validate found errors in %s : %s" % (os.path.basename(dfile), output))
+                self.target.total_checks += 1
+                
+                # Various tests
+                dfile_fd = open("."+dfile, "r")
+                for line in dfile_fd:
+                    # Check categories
+                    if line.startswith("Categories"):
+                        categories = line.strip().replace("Categories=", "").split(";")
+                        if categories[-1] == "":
+                            categories = categories[:-1]
+                        self.check_categories(categories)
+                        self.target.total_checks += 1
+                    # Check MimeType scriptlets
+                    if line.startswith("MimeType") and line.strip().replace("MimeType=", "") != "":
+                        scripts = { "post": filehdr[rpm.RPMTAG_POSTIN],
+                                    "postun": filehdr[rpm.RPMTAG_POSTUN],
+                                  }
+                        if scripts["post"].count("update-desktop-database") == 0 \
+                            or scripts["postun"].count("update-desktop-database") == 0:
+                            self.has_failed("Scriptlets: missing update-desktop-database\n  (wiki: ScriptletSnippets)")
+                        self.target.total_checks += 1
+                    # Check Icon
+                    if line.startswith("Icon"):
+                        icon = line.strip().replace("Icon=", "")
+                        if not icon.startswith("/") and icon[-4:] in [".png", ".svg", ".xpm"]:
+                            self.has_failed("Desktop file: the Icon tag should either use the full path to the icon or the icon name without extension\n  (wiki:Packaging/Guidelines#desktop)")
+                        self.target.total_checks += 1
+                dfile_fd.close()
+                os.system("rm -rf usr")
+
+
+class CheckScriptletsRequirements(QACheck):
+    """Checks that the usual programs found in the scriptlets are Required"""
+
+    order = 1180
+
+    def check(self):
+        pr("Checking scriptlets requirements", 2)
+        if not self.check_built():
+            return
+        ts = rpm.ts()
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            if not os.path.exists(filepath):
+                continue
+            filehdr = rpmUtils.miscutils.hdrFromPackage(ts, filepath)
+            scripts = { "pre": filehdr[rpm.RPMTAG_PREIN],
+                        "preun": filehdr[rpm.RPMTAG_PREUN],
+                        "post": filehdr[rpm.RPMTAG_POSTIN],
+                        "postun": filehdr[rpm.RPMTAG_POSTUN],
+                      }
+            requires = filehdr[rpm.RPMTAG_REQUIRES]
+            progs_check = {"service": "initscripts",
+                           "chkconfig": "chkconfig",
+                           "scrollkeeper-update": "scrollkeeper",
+                           "install-info": "info",
+                           "gconftool-2": "GConf2",
+                          }
+            for prog, package in progs_check.iteritems():
+                for scriptname, script in scripts.iteritems():
+                    if script.count(prog) > 0 and package not in requires:
+                        filename_required = False
+                        for r in requires: # Check if the filename is not required instead of the package
+                            if r.endswith(prog):
+                                filename_required = True
+                        if not filename_required:
+                            self.has_failed("Missing dependancy on %s for %%%s (package %s)" % (prog, scriptname, package))
+        self.target.total_checks += 1
+
+
+class CheckLangTag(QACheck):
+    """checks that the translation files are tagged"""
+
+    order = 1190
+
+    def check(self):
+        pr("Checking lang files", 2)
+        if not self.check_built():
+            return
+        ts = rpm.ts()
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            if not os.path.exists(filepath):
+                continue
+            filehdr = rpmUtils.miscutils.hdrFromPackage(ts, filepath)
+            filelist = filehdr[rpm.RPMTAG_FILENAMES]
+            filelang = filehdr[rpm.RPMTAG_FILELANGS]
+            for filename, lang in zip(filelist, filelang):
+                if filename.startswith("/usr/share/locale/") and filename.endswith(".mo"):
+                    if not lang:
+                        self.has_failed("The translation files are not properly tagged\n  (wiki: Packaging/ReviewGuidelines)")
+                        return
+        self.target.total_checks += 1
+
+
+class CheckDBUpdate(QACheck):
+    """checks that the package updates the proper database in the scriptlets if it has corresponding files"""
+
+    order = 1200
+
+    def checkFileUpdateDB(self, prefix, updater, scriptlist=["post","postun"]):
+        ts = rpm.ts()
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            if not os.path.exists(filepath):
+                continue
+            filehdr = rpmUtils.miscutils.hdrFromPackage(ts, filepath)
+            filelist = filehdr[rpm.RPMTAG_FILENAMES]
+            need_update = False
+            for f in filelist:
+                if f.startswith(prefix):
+                    need_update = True
+            if need_update:
+                scripts = { "pre": filehdr[rpm.RPMTAG_PREIN],
+                            "preun": filehdr[rpm.RPMTAG_PREUN],
+                            "post": filehdr[rpm.RPMTAG_POSTIN],
+                            "postun": filehdr[rpm.RPMTAG_POSTUN],
+                          }
+                for scr in scriptlist:
+                    if scripts[scr].count(updater) == 0:
+                        message = "missing \"%s\" in %%%s (wiki: ScriptletSnippets)" % (updater, scr)
+                        if len(self.target.rpmfilenames) > 1:
+                            message += " (in subpackage %s)" % filehdr[rpm.RPMTAG_NAME]
+                        self.has_failed("Scriptlets: "+message)
+
+    def check(self):
+        pr("Checking for the need to update databases in scriptlets", 2)
+        if not self.check_built():
+            return
+        # format : (<if there are files in these dirs>, <run this script>, <in these scriptlets>)
+        check_list = [ ("/usr/share/omf/", "scrollkeeper-update", ["post","postun"]),
+                       ("/usr/share/mime/packages/", "update-mime-database", ["post","postun"]),
+                       ("/usr/share/icons/", "gtk-update-icon-cache", ["post","postun"]),
+                       ("/usr/share/info/", "install-info", ["post","preun"]),
+                       ("/etc/gconf/schemas/", "gconftool-2", ["pre","post","preun"]),
+                       ("/etc/rc.d/init.d/", "chkconfig", ["post","preun"]),
+                       ("/etc/rc.d/init.d/", "service", ["preun","postun"]),
+                     ]
+        for prefix, updater, scriptlist in check_list:
+            pr("  checking %s..." % updater, 2)
+            self.checkFileUpdateDB(prefix, updater, scriptlist)
+        self.target.total_checks += 1
+
+
+class CheckOwnedDirs(QACheck):
+    """checks that the package does not own standard dirs"""
+
+    order = 1210
+
+    def check(self):
+        pr("Checking directory ownership", 2)
+        if not self.check_built():
+            return
+        ts = rpm.ts()
+        standard_dirs = []
+        # Get the list of files in packages "filesystem" and "man"
+        for pkg in ("filesystem", "man"):
+            mi = ts.dbMatch("name", pkg)
+            for hdr in mi: # there should be only one result, but we do a for loop anyway (follows the docs)
+                standard_dirs.extend(hdr[rpm.RPMTAG_FILENAMES])
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            if not os.path.exists(filepath):
+                continue
+            filehdr = rpmUtils.miscutils.hdrFromPackage(ts, filepath)
+            filelist = filehdr[rpm.RPMTAG_FILENAMES]
+            for filename in filelist:
+                if filename in standard_dirs:
+                    self.has_failed("The package owns %s, which is a standard directory\n  (wiki: Packaging/ReviewGuidelines)" % filename)
+        self.target.total_checks += 1
+
+
+class CheckConfigFiles(QACheck):
+    """checks config files list and ownership"""
+
+    order = 1220
+
+    def check(self):
+        pr("Checking config files", 2)
+        if not self.check_built():
+            return
+        ts = rpm.ts()
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            if not os.path.exists(filepath):
+                continue
+            filehdr = rpmUtils.miscutils.hdrFromPackage(ts, filepath)
+            filetags = filehdr[rpm.RPMTAG_FILEFLAGS]
+            filenames = filehdr[rpm.RPMTAG_FILENAMES]
+            filemodes = filehdr[rpm.RPMTAG_FILEMODES]
+            filetags = filehdr[rpm.RPMTAG_FILEFLAGS]
+            files = zip(filenames, filemodes, filetags)
+            has_conf_file = False
+            for tag in filetags:
+                if tag & rpm.RPMFILE_CONFIG:
+                    has_conf_file = True
+            if not has_conf_file:
+                continue
+            pr("Config files in package %s:" % file)
+            os.system("rpm -qpcv %s | less" % filepath)
+            subpackage = file[:file.rindex(self.target.version)-1]
+            self.approve("Config files of "+subpackage)
+
+
+class CheckPkgconfig(QACheck):
+    """checks if the package needs to Require pkgconfig"""
+
+    order = 1230
+
+    def check(self):
+        pr("Checking pkgconfig files", 2)
+        if not self.check_built():
+            return
+        ts = rpm.ts()
+        is_graphical = False
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            if not os.path.exists(filepath):
+                continue
+            filehdr = rpmUtils.miscutils.hdrFromPackage(ts, filepath)
+            filelist = filehdr[rpm.RPMTAG_FILENAMES]
+            has_pkgconfig = False
+            for f in filelist:
+                if f.startswith("/usr/lib/pkgconfig/") and f.endswith(".pc"):
+                    has_pkgconfig = True
+            if not has_pkgconfig:
+                continue
+            requires = filehdr[rpm.RPMTAG_REQUIRES]
+            has_pkgconfig = False
+            for r in requires:
+                if r.count("pkgconfig"):
+                    has_pkgconfig = True
+            if not has_pkgconfig:
+                self.has_failed("As %s ships a pkgconfig file (.pc), it should have \"Requires: pkgconfig\"" % filehdr[rpm.RPMTAG_NAME])
+        self.target.total_checks += 1
+
+
+class CheckHicolor(QACheck):
+    """checks if the package needs to Require hicolor-icon-theme"""
+
+    order = 1240
+
+    def check(self):
+        pr("Checking hicolor icons", 2)
+        if not self.check_built():
+            return
+        ts = rpm.ts()
+        is_graphical = False
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            if not os.path.exists(filepath):
+                continue
+            filehdr = rpmUtils.miscutils.hdrFromPackage(ts, filepath)
+            filelist = filehdr[rpm.RPMTAG_FILENAMES]
+            has_hicolor = False
+            for f in filelist:
+                if f.startswith("/usr/share/icons/hicolor/"):
+                    has_hicolor = True
+            if not has_hicolor:
+                continue
+            requires = filehdr[rpm.RPMTAG_REQUIRES]
+            has_hicolor = False
+            for r in requires:
+                if r.count("hicolor-icon-theme"):
+                    has_hicolor = True
+            if not has_hicolor:
+                self.has_failed("As %s ships icons in the hicolor directory, it should have \"Requires: hicolor-icon-theme\"\n  https://www.redhat.com/archives/fedora-extras-list/2006-September/msg00282.html" % self.target.name)
+        self.target.total_checks += 1
+
+
+class CheckOptFlags(QACheck):
+    """checks if the rpm honors the compiler flags"""
+
+    order = 1250
+
+    def check(self):
+        pr("Checking compiler flags", 2)
+        if not self.check_built():
+            return
+        if self.target.arch == "noarch":
+            return
+        optflags = commands.getoutput("rpm --eval '%{optflags}'")
+        buildlog = open(self.target.reportDir+"/build.log", "r")
+        flags_count = 0
+        for line in buildlog:
+            if line.count(optflags):
+                flags_count += 1
+        buildlog.close()
+        if flags_count <= 3: # 3 because of the definitions by the %configure macro
+            self.has_failed("Does not seem to obey the compiler flags\n  (wiki: Packaging/Guidelinesi#CompilerFlags)")
+        self.target.total_checks += 1
+
+class CheckStaticLibs(QACheck):
+    """checks the presence of statically-linked libraries"""
+
+    order = 1260
+
+    def check(self):
+        pr("Checking static libs", 2)
+        if not self.check_built():
+            return
+        ts = rpm.ts()
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            if not os.path.exists(filepath):
+                continue
+            filehdr = rpmUtils.miscutils.hdrFromPackage(ts, filepath)
+            filelist = filehdr[rpm.RPMTAG_FILENAMES]
+            for f in filelist:
+                if os.path.dirname(f) == "/usr/lib/" and f.endswith(".a"):
+                    self.has_failed("The package contains static libraries\n  (wiki: Packaging/Guidelines#StaticLinkage)")
+                    return
+        self.target.total_checks += 1
+
+class CheckConfigFilesLocation(QACheck):
+    """checks config files location"""
+
+    order = 1270
+
+    def check(self):
+        pr("Checking config files location", 2)
+        if not self.check_built():
+            return
+        ts = rpm.ts()
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            if not os.path.exists(filepath):
+                continue
+            filehdr = rpmUtils.miscutils.hdrFromPackage(ts, filepath)
+            filenames = filehdr[rpm.RPMTAG_FILENAMES]
+            filetags = filehdr[rpm.RPMTAG_FILEFLAGS]
+            files = zip(filenames, filetags)
+            for filename, filetag in files:
+                if filetag & rpm.RPMFILE_CONFIG:
+                    if filename.startswith("/usr"):
+                        self.has_failed("The file '%s' is flagged as %%config and is in /usr\n  (wiki: Packaging/Guidelines#Config)" % filename)
+        self.target.total_checks += 1
+
+class CheckInitScripts(QACheck):
+    """checks init scripts"""
+
+    order = 1280
+
+    def check(self):
+        pr("Checking init scripts", 2)
+        if not self.check_built():
+            return
+        init_scripts_number = 0
+        ts = rpm.ts()
+        for file in self.target.rpmfilenames:
+            filepath = self.target.reportDir+"/"+file
+            if not os.path.exists(filepath):
+                continue
+            filehdr = rpmUtils.miscutils.hdrFromPackage(ts, filepath)
+            filenames = filehdr[rpm.RPMTAG_FILENAMES]
+            filemodes = filehdr[rpm.RPMTAG_FILEMODES]
+            filetags = filehdr[rpm.RPMTAG_FILEFLAGS]
+            files = zip(filenames, filemodes, filetags)
+            for filename, filemode, filetag in files:
+                if not filename.startswith("/etc/rc.d/init.d/"):
+                    continue
+                init_scripts_number += 1
+                if filetag & rpm.RPMFILE_CONFIG:
+                    self.has_failed("The init script '%s' is flagged as %%config\n  (wiki: Packaging/Guidelines#Init)" % filename)
+                if stat.S_IMODE(filemode) != 493: # mode 755 : stat.S_IRWXU + stat.S_IRGRP + stat.S_IXGRP + stat.S_IROTH + stat.S_IXOTH
+                    self.has_failed("The init script '%s' does not have mode 755\n  (wiki: Packaging/Guidelines#Init)" % filename)
+        self.target.total_checks += init_scripts_number
+
+
+
+
+
+
+
+
+##########################
+
+# Class for Bugzilla
+
+class QABugError(QAError): pass
+
+class QABug:
+    """These objects are the Bugzilla bugs from Fedora Extras or Livna.org"""
+
+    bugID = None
+    webpage = None
+    
+    def __init__(self, bugID, origin="fedora"):
+        try:
+            self.bugID = int(bugID)
+        except ValueError:
+            raise QABugError("This does not look like a bug ID, and I can't find this SRPM.")
+        self.bugzillaURL = 'https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=%d'
+        if origin == "livna":
+            self.bugzillaURL = 'http://bugzilla.livna.org/show_bug.cgi?id=%d'
+
+    def get_srpm(self, local=False):
+        '''Gets the SRPM from the web'''
+        srpmURL = self.get_srpm_url()
+        filename = os.path.basename(srpmURL)
+        if local and os.path.exists(filename):
+            return filename
+        elif local and not os.path.exists(filename):
+            pr("File %s not found, downloading..." % filename)
+        pr("Downloading SRPM from: %s" % srpmURL)
+        try:
+            urlgrabber.urlgrab(srpmURL, reget='check_timestamp', progress_obj=urlgrabber.progress.TextMeter(fo=sys.stdout))
+        except urlgrabber.grabber.URLGrabError, e:
+            pr("ERROR: can't find SRPM")
+            sys.exit(1)
+        return filename
+
+    def get_srpm_url(self):
+        '''Parses bugzilla to get the SRPM URL'''
+        if not self.webpage:
+            try:
+                self.webpage = urlgrabber.urlread(self.bugzillaURL % self.bugID)
+            except urlgrabber.grabber.URLGrabError:
+                raise QABugError("Can't access bugzilla, please download the srpm manually")
+        srpmList = re.compile('"((ht|f)tp(s)?://.*?\.src\.rpm)"', re.IGNORECASE).findall(self.webpage)
+        if srpmList == []:
+            raise QABugError("no srpm found in page, please download it manually")
+        srpmURL = srpmList[-1][0] # Use the last one. We could also use the newer one with rpmUtils.miscutils.compareEVR()
+        if not srpmURL:
+            errormsg = "impossible to find the srpm in the page, " \
+                      +"please download it manually.\n%s" % srpmList
+            raise QABugError(errormsg)
+        self.filename = os.path.basename(srpmURL)
+        pr("SRPM URL: "+srpmURL, 2)
+        return srpmURL
+
+    def get_subject(self):
+        '''Parses bugzilla to get the Subject'''
+        if not self.webpage:
+            try:
+                self.webpage = urlgrabber.urlread(self.bugzillaURL % self.bugID)
+            except urlgrabber.grabber.URLGrabError:
+                return "" # that's not a blocking error.
+        subjectList = re.compile('<title>Bug %s: (Review Request: )?(.*)</title>' % self.bugID, re.IGNORECASE).findall(self.webpage)
+        if subjectList == []:
+            return ""
+        subject = subjectList[0][1]
+        if not subject:
+            return ""
+        pr("Found subject: "+subject, 2)
+        return subject
+
+
+###############################
+
+## MAIN
+
+
+if __name__ == "__main__":
+    print "Checking for updated guidelines on the wiki..."
+    check_requires(REQUIRES)
+    #pr("Checking for updated guidelines...", 2)
+    check_guidelines(GUIDELINES)
+    try:
+        conf = parse_config()
+        # get options and arguments
+        arg, origin, debug, do_checks, local = parse_options()
+        if do_checks:
+            for do_check in do_checks:
+                if do_check not in list_checks():
+                    print "ERROR: %s is not an available check" % do_check
+                    sys.exit(1)
+        if not arg.endswith("src.rpm"):
+            bug = QABug(arg, origin)
+            print "Starting QA for bug %s (%s)" % (arg, bug.get_subject())
+            srpmFileName = bug.get_srpm(local)
+        else:
+            print "Starting QA for local srpm %s" % arg
+            srpmFileName = arg
+        try:
+            srpm = QAPackage(srpmFileName, origin, conf["reportsdir"])
+        except QAPackageError, e:
+            print "ERROR: %s" % e
+            sys.exit(1)
+        pr("Installing SRPM", 2)
+        srpm.installSRPM()
+        srpm.getReleaseFromSpec()
+        if do_checks:
+            for do_check in do_checks:
+                check = eval(do_check)(srpm)
+                srpm.addCheck(check)
+        else:
+            for name in list_checks():
+                check = eval(name)(srpm)
+                srpm.addCheck(check)
+        srpm.runChecks()
+        if not do_checks: # We only save reports on full run (with all checks)
+            srpm.saveReport()
+        srpm.printReport()
+    except QABugError, e:
+        print "ERROR: %s" % e
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print "Interrupted by user"
+        sys.exit(1)
+
+
+
+# vim: set expandtab tabstop=4 shiftwidth=4 :
+
