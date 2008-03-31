@@ -4,6 +4,7 @@ import os
 import string
 import sys
 import commands
+from OpenSSL import crypto
 
 def readUser():
     ''' sample line "Subject: C=US, ST=North Carolina, O=Fedora Project, OU=Dennis Gilmore, CN=ausil/emailAddress=dennis@ausil.us" '''
@@ -14,14 +15,14 @@ def readUser():
         print "!!!    cannot read your ~/.fedora.cert file   !!!"
         print "!!! Ensure the file is readable and try again !!!"
         os.exit(1)
-    for certLine in  userCert.split("\n"):
-        if not len(certLine):
-            continue
-        stripCertLine = certLine.strip()
-        if stripCertLine.startswith("Subject: "):
-            subjectLine = certLine.split("CN=")
-            name = subjectLine[1].split("/")
-            return name[0]
+    myCert = crypto.load_certificate(1, userCert)
+    if myCert.has_expired():
+        print "Certificate expired please get a new one"
+        sys.exit(1)
+    subject = str(myCert.get_subject())
+    subjectLine = subject.split("CN=")
+    name = subjectLine[1].split("/")
+    return name[0]
       
 
 def cvsco(user, module):

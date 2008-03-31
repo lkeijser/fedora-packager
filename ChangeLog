@@ -1,3 +1,6 @@
+* Dennis Gilmore <dennis@ausil.us> - 0.3.0
+- use pyOpenSSL to determine username
+- make sure cert is valid
 * Dennis Gilmore <dennis@ausil.us> - 0.2.0
 - fedora-cvs now allows checking out multiple modules
 - update urls for fedorahosted

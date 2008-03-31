@@ -66,7 +66,7 @@ AUTOMAKE = ${SHELL} /home/dennis/code/fedora-packager/missing --run automake-1.1
 AWK = gawk
 BASH = /bin/sh
 CYGPATH_W = echo
-DEFS = -DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE=\"fedora-packager\" -DVERSION=\"0.2.0\"
+DEFS = -DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE=\"fedora-packager\" -DVERSION=\"0.3.0\"
 ECHO_C = 
 ECHO_N = -n
 ECHO_T = 
@@ -91,7 +91,7 @@ PYTHON = /usr/bin/python
 SET_MAKE = 
 SHELL = /bin/sh
 STRIP = 
-VERSION = 0.2.0
+VERSION = 0.3.0
 abs_builddir = /home/dennis/code/fedora-packager
 abs_srcdir = /home/dennis/code/fedora-packager
 abs_top_builddir = /home/dennis/code/fedora-packager
