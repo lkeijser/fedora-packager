@@ -1,0 +1,4 @@
+Mar 30 2008
+We are now using pyOpenSSL to work out username  and checking that certificate is valid.
+
+
