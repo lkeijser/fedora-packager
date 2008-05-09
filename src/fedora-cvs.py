@@ -14,7 +14,7 @@ def readUser():
     else:
         print "!!!    cannot read your ~/.fedora.cert file   !!!"
         print "!!! Ensure the file is readable and try again !!!"
-        os.exit(1)
+        sys.exit(1)
     myCert = crypto.load_certificate(1, userCert)
     if myCert.has_expired():
         print "Certificate expired please get a new one"
