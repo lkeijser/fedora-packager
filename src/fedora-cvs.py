@@ -1,57 +1,76 @@
 #!/usr/bin/python
 
-import os
-import string
-import sys
 import commands
+import optparse
+import os
+import sys
+
 from OpenSSL import crypto
 
-def readUser():
-    ''' sample line "Subject: C=US, ST=North Carolina, O=Fedora Project, OU=Dennis Gilmore, CN=ausil/emailAddress=dennis@ausil.us" '''
-    userCert = ""
-    if os.access(os.path.join(os.path.expanduser('~'),".fedora.cert"), os.R_OK):
-            userCert = open(os.path.join(os.path.expanduser('~'),".fedora.cert"), "r").read()
-    else:
+PKG_ROOT = 'cvs.fedoraproject.org:/cvs/pkgs'
+
+
+def read_cert_user():
+    """Figure out the Fedora user name from ~/.fedora.cert.  Sample line:
+
+        Subject: C=US, ST=North Carolina, O=Fedora Project, OU=Dennis Gilmore, CN=ausil/emailAddress=dennis@ausil.us
+    """
+
+    # Mak sure we can even read the thing.
+    cert_file = os.path.join(os.path.expanduser('~'), ".fedora.cert")
+    if not os.access(cert_file, os.R_OK):
         print "!!!    cannot read your ~/.fedora.cert file   !!!"
         print "!!! Ensure the file is readable and try again !!!"
         sys.exit(1)
-    myCert = crypto.load_certificate(1, userCert)
-    if myCert.has_expired():
-        print "Certificate expired please get a new one"
+
+    user_cert = open(cert_file, "r").read()
+    my_cert = crypto.load_certificate(crypto.FILETYPE_PEM, user_cert)
+
+    if my_cert.has_expired():
+        print "Certificate expired; please get a new one."
         sys.exit(1)
-    subject = str(myCert.get_subject())
-    subjectLine = subject.split("CN=")
-    name = subjectLine[1].split("/")
-    return name[0]
-      
 
-def cvsco(user, module):
-    '''CVSROOT=:ext:ausil@cvs.fedoraproject.org:/cvs/extras/'''
-    print "Checking out %s from fedora cvs:" % module
-    (s, o) = commands.getstatusoutput("CVSROOT=:ext:%s@cvs.fedoraproject.org:/cvs/pkgs/ CVS_RSH=ssh cvs co %s" % (user, module))
-    if s != 0:
-        print "Error: %s" % o
+    subject = str(my_cert.get_subject())
+    subject_line = subject.split("CN=")
+    cn_parts = subject_line[1].split("/")
+
+    return cn_parts[0]
+
+
+def main(user, pkg_list):
+    if user is not None:
+        cvs_env = "CVSROOT=:ext:%s@%s CVS_RSH=ssh" % (user, PKG_ROOT)
     else:
-        print o
+        cvs_env = "CVSROOT=:pserver:anonymous@" + PKG_ROOT
 
-def usage():
-    print """
-    add the modules you wish to check out from cvs
-    example fedora-cvs konversation mysql cvs mercurial
-    """
+    for module in pkg_list:
+        print "Checking out %s from fedora CVS as %s:" % \
+            (module, user or "anonymous")
 
-def main(pkg):
-    userName = readUser()
-    for Item in pkg:
-        cvsco(userName, Item)
+        retcode, output = commands.getstatusoutput("%s cvs co %s" %
+                                                   (cvs_env, module))
+
+        if retcode != 0:
+            print "Error: %s" % (output,)
+        else:
+            print output
+
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        usage()
-        sys.exit(1)
-    #the package we want to pull from cvs 
-    pkg = sys.argv
-    pkg.remove(sys.argv[0])
+    opt_p = optparse.OptionParser(usage="%prog [OPTIONS] module ...")
 
-    main(pkg)
+    opt_p.add_option('-a', '--anonymous', action='store_true', dest='anon',
+                     help="Use anonymous CVS.")
 
+    opts, pkgs = opt_p.parse_args()
+
+    if len(pkgs) < 1:
+        opt_p.error("You must specify at least one module to check out.")
+
+    # Determine user name, if any
+    if opts.anon:
+        user = None
+    else:
+        user = read_cert_user()
+
+    main(user, pkgs)
