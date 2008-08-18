@@ -1,3 +1,6 @@
+* Dennis Gilmore <dennis@ausil.us> - 0.3.1
+- allow annonymouse cvs checkouts
+- always get new ca certs
 * Dennis Gilmore <dennis@ausil.us> - 0.3.0
 - use pyOpenSSL to determine username
 - make sure cert is valid

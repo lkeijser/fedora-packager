@@ -19,10 +19,14 @@ if [ ! -f ~/.fedora.cert ]; then
     exit 1
 fi
 
+rm ~/.fedora-upload-ca.cert
+
 if [ ! -f ~/.fedora-upload-ca.cert ]; then
     check_wget
     /usr/bin/wget -q "https://admin.fedoraproject.org/accounts/fedora-upload-ca.cert" -O ~/.fedora-upload-ca.cert
 fi
+
+rm ~/.fedora-server-ca.cert
 
 if [ ! -f ~/.fedora-server-ca.cert ]; then
     check_wget
@@ -36,7 +40,7 @@ fi
 # remove existing contents of ~/.koji to avoid confusion
 rm -f ~/.koji/*
 
-for arch in arm alpha ia64 sparc s390 ;do 
+for arch in arm alpha ia64 sparc s390 parisc ;do 
 cat > ~/.koji/$arch-config <<EOF
 [koji]
 
