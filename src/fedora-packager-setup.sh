@@ -69,7 +69,25 @@ ca = ~/.fedora-upload-ca.cert
 serverca = ~/.fedora-server-ca.cert
 
 EOF
+echo "Wrote $arch koji config file"
 done
+
+cat > ~/.plague-client.cfg <<EOF
+[Certs]
+user-ca-cert = ~/.fedora-upload-ca.cert
+server-ca-cert = ~/.fedora-server-ca.cert
+user-cert = ~/.fedora.cert
+
+[User]
+email = $email
+
+[Server]
+use_ssl = yes
+upload_user = me
+allow_uploads = no
+address = https://buildsys.fedoraproject.org:8887
+EOF
+echo "Wrote Plague Config file"
 
 cat <<EOF
 Creating an SSL certificate to import into your browser, to enable
