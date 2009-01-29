@@ -1,0 +1,14 @@
+# use glob style matching
+syntax: glob
+
+INSTALL
+Makefile
+Makefile.in
+aclocal.m4
+autom4te.cache/
+config.log
+config.status
+configure
+fedora-packager*.tar.bz2
+install-sh
+missing
