@@ -11,12 +11,10 @@ PKG_ROOT = 'cvs.fedoraproject.org:/cvs/pkgs'
 
 
 def read_cert_user():
-    """Figure out the Fedora user name from ~/.fedora.cert.  Sample line:
-
-        Subject: C=US, ST=North Carolina, O=Fedora Project, OU=Dennis Gilmore, CN=ausil/emailAddress=dennis@ausil.us
+    """Figure out the Fedora user name from ~/.fedora.cert. uses PyOpenSSL
     """
 
-    # Mak sure we can even read the thing.
+    # Make sure we can even read the thing.
     cert_file = os.path.join(os.path.expanduser('~'), ".fedora.cert")
     if not os.access(cert_file, os.R_OK):
         print "!!!    cannot read your ~/.fedora.cert file   !!!"

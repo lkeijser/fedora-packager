@@ -37,10 +37,9 @@ if [ ! -d ~/.koji ]; then
     mkdir  ~/.koji
 fi
 
-# remove existing contents of ~/.koji to avoid confusion
-rm -f ~/.koji/*
 
 for arch in arm alpha ia64 sparc s390 parisc ;do 
+rm -f ~/.koji/$arch-config
 cat > ~/.koji/$arch-config <<EOF
 [koji]
 
