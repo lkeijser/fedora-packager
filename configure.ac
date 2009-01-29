@@ -1,5 +1,5 @@
-AC_INIT
-AM_INIT_AUTOMAKE(fedora-packager,0.3.2)
+AC_INIT([fedora-packager], [0.3.2])
+AM_INIT_AUTOMAKE([dist-bzip2 no-dist-gzip])
 AC_PATH_PROGS(PYTHON, python)
 AC_PATH_PROGS(BASH, sh bash)
 AC_OUTPUT(Makefile)
