@@ -1,8 +1,5 @@
 * Make Makefile work
-* add SPEC file,  we will require rpmdevtools, koji, plague, ??
 * add extra scripts to do cool useful things
 * do up a README 
 * complete NEWS and ChangeLog files
-* rewrite fedora-packager-setup in python 
 - have it get the certificate directly when needed
-- setup plague as well as koji
