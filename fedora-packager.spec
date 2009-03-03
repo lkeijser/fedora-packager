@@ -1,5 +1,5 @@
 Name:           fedora-packager
-Version:        0.3.1
+Version:        0.3.3
 Release:        1%{?dist}
 Summary:        Tools for setting up a fedora maintainer environment
 
@@ -9,9 +9,10 @@ URL:            https://fedorahosted.org/fedora-packager
 Source0:        https://fedorahosted.org/fedora-packager/attachment/wiki/WikiStart/fedora-packager-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-Requires:       koji bodhi-client plague-client
+Requires:       koji bodhi-client 
 Requires:       rpm-build rpmdevtools rpmlint
-Requires:       mock pyOpenSSL curl wget cvs
+Requires:       pyOpenSSL python-pycurl
+Requires:       mock curl wget cvs 
 
 BuildArch:      noarch
 
