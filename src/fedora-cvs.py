@@ -4,6 +4,7 @@ import commands
 import optparse
 import os
 import sys
+from subprocess import *
 
 from OpenSSL import crypto
 
@@ -44,14 +45,13 @@ def main(user, pkg_list):
     for module in pkg_list:
         print "Checking out %s from fedora CVS as %s:" % \
             (module, user or "anonymous")
+        try:
+            retcode = call("%s /usr/bin/cvs co %s" % (cvs_env, module), shell=True)
+            if retcode < 0:
+                print >>sys.stderr, "CVS Checkout failed Error:", -retcode
+        except OSError, e:
+            print >>sys.stderr, "Execution failed:", e
 
-        retcode, output = commands.getstatusoutput("%s cvs co %s" %
-                                                   (cvs_env, module))
-
-        if retcode != 0:
-            print "Error: %s" % (output,)
-        else:
-            print output
 
 
 if __name__ == '__main__':
