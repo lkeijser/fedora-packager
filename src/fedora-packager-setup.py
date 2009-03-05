@@ -103,13 +103,13 @@ def download_cert(location, file):
 def main():
     user_home = os.path.expanduser('~')
     print 'Setting up Fedora packager environment'
-    user_cert = "%s/.fedora.cert" % user_home
-    upload_ca_cert = '%s/.fedora-upload-ca.cert' % user_home
-    server_ca_cert = '%s/.fedora-server-ca.cert' % user_home
+    user_cert = os.path.join(user_home, '.fedora.cert')
+    upload_ca_cert = os.path.join(user_home, '.fedora-upload-ca.cert')
+    server_ca_cert = os.path.join(user_home, '.fedora-server-ca.cert')
     if not os.path.isfile(user_cert):
-        print "You need a client certificate from the Fedora Account System"
-        print "Please download one from https://admin.fedoraproject.org/accounts/user/gencert"
-        print "Save it to ~/.fedora.cert and re-run this script"
+        print '''You need a client certificate from the Fedora Account System
+Please download one from https://admin.fedoraproject.org/accounts/user/gencert
+Save it to ~/.fedora.cert and re-run this script'''
         sys.exit(1)
     download_cert('https://admin.fedoraproject.org/accounts/fedora-server-ca.cert', server_ca_cert)
     if not os.path.islink(upload_ca_cert):
