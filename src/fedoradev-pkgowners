@@ -110,13 +110,19 @@ this_init()
 lookup_package()
 {
 	local package_info="$(grep "${filter_for}|${1}|" "${file_pkgdbfiledata}")"
-	local owner="$(echo ${package_info} | cut -d '|' -f 4)"
-	if [[ ! "${owner}" ]]; then
-		# grep did not find anything or something else went wrong
-		echo "Could not find owner for ${1}" >&2
+	if [[ ! "${package_info}" ]]; then
+		# grep did not find anything or something else went wrong, eg.
+		# https://fedorahosted.org/packagedb/ticket/138
+		echo "Warning: could not find info for ${1}" >&2
 		return 1
 	fi
 
+	# owner?
+	local owner="$(echo ${package_info} | cut -d '|' -f 4)"
+	if [[ ! "${owner}" || "${owner}" == orphan ]]; then
+		# No owner, assume orphan
+		owner="(orphan)"
+	fi
 
 	# co-maintainers?
 	if [[ "${print_comaintainers}" ]]; then
