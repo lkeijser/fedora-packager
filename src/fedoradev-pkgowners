@@ -60,7 +60,7 @@ this_init()
 	# check fasfile -- needs to be local, thus check first
 	if [[ "${file_fadcsvdata}" ]]; then
 		if [[ ! -s "${file_fadcsvdata}" ]]; then
-			echo "Could not find fas-datafile ${file_fadcsvdata}" >&2
+			echo "Empty or nonexistent fas-datafile ${file_fadcsvdata}" >&2
 			exit 2
 		fi
 
@@ -74,7 +74,7 @@ this_init()
 	# pkgdb bugzilla data for owners
 	if [[ "${file_pkgdbfiledata}" ]]; then
 		if [[ ! -s "${file_pkgdbfiledata}" ]]; then
-			echo "Could not find pgkdb-datafile ${file_pkgdbfiledata}" >&2
+			echo "Empty or nonexistent pkgdb-datafile ${file_pkgdbfiledata}" >&2
 			exit 2
 		fi
 	else
