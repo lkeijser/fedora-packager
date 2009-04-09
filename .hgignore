@@ -12,3 +12,5 @@ configure
 fedora-packager*.tar.bz2
 install-sh
 missing
+fedora-cvs
+fedora-packager-setup
