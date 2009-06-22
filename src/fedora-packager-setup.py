@@ -114,7 +114,8 @@ def main():
     download_cert('https://admin.fedoraproject.org/accounts/fedora-server-ca.cert', server_ca_cert)
     if not os.path.islink(upload_ca_cert):
         print 'Linking: ~/.fedora-server-ca.cert to ~/.fedora-upload-ca.cert'
-        os.unlink(upload_ca_cert)
+        if os.path.exists(upload_ca_cert):
+            os.unlink(upload_ca_cert)
         os.symlink(server_ca_cert, upload_ca_cert)
     if not os.path.isdir(os.path.join(user_home, '.koji')):
         os.mkdir(os.path.join(user_home, '.koji'))
