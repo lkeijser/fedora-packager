@@ -124,7 +124,10 @@ def main():
         if not  os.path.isfile(config_file):
             write_arch_config(arch, config_file)
         else:
-            print "koji config for %s exists" % arch
+            print "koji config for %s exists. Replacing with new file." % arch
+            os.unlink(config_file)
+            write_arch_config(arch, config_file)
+            
     print 'Setting up Browser Certificates'
     generate_browser_cert()
 
