@@ -1,3 +1,7 @@
+Jun 21 2009
+add hppa configs. fix bug in fedora-packager-setup trying to unlink non existant file
+
+
 Mar 02 2009
 rewrite fedora-packager-setup in python
 

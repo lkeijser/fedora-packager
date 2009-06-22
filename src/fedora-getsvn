@@ -1,0 +1,22 @@
+#! /bin/sh
+
+if [ $# -ne 3 ];
+then
+	echo "Usage: $0 <project> <url> <revision>"
+	exit 1
+fi
+
+project=$1
+url=$2
+rev=$3
+
+tmpdir=`mktemp -d`
+curdir=`pwd`
+
+(
+    cd ${tmpdir}
+    LANG=C TZ=GMT svn export ${url} -r ${rev} ${project}
+    tar cjvf ${curdir}/${project}-svn${rev}.tar.bz2 ${project}
+)
+
+rm -rf ${tmpdir}
