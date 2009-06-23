@@ -1,4 +1,4 @@
-bin_SCRIPTS = fedora-cvs fedora-packager-setup
+bin_SCRIPTS = fedora-cvs fedora-packager-setup fedoradev-pkgowners fedora-cert fedora-getsvn
 CLEANFILES = $(bin_SCRIPTS)
 EXTRA_DIST = src/fedora-cvs.py src/fedora-packager-setup.py
 
