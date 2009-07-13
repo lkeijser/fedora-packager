@@ -1,5 +1,6 @@
-* Dennis Gilmore <dennis@ausil.us> - 0.4.0
+* Dennis Gilmore <dennis@ausil.us> - 0.3.5
 - script for doing svn checkouts
+- add rpmbuild-md5
 - download usercerts
 * Dennis Gilmore <dennis@ausil.us> - 0.3.1
 - allow annonymouse cvs checkouts

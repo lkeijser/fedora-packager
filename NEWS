@@ -1,3 +1,6 @@
+Jul 13 2009
+add rpmbuild-md5  it creates rpms with old style hashes
+
 Jun 21 2009
 add hppa configs. fix bug in fedora-packager-setup trying to unlink non existant file
 

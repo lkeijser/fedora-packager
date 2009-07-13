@@ -7,68 +7,37 @@ from fedora.client.fas2 import AccountSystem
 from fedora.client.fas2 import CLAError
 from fedora.client import AuthError, ServerError
 from OpenSSL import crypto
-import urlgrabber
 
+def read_cert_user():
+    """
+    Figure out the Fedora user name from ~/.fedora.cert
 
-def _open_cert():
     """
-    Read in the certificate so we dont duplicate the code 
-    """
-     # Make sure we can even read the thing.
+    # Make sure we can even read the thing.
     cert_file = os.path.join(os.path.expanduser('~'), ".fedora.cert")
     if not os.access(cert_file, os.R_OK):
         print "!!!    cannot read your ~/.fedora.cert file   !!!"
         print "!!! Ensure the file is readable and try again !!!"
         sys.exit(1)
-    raw_cert = open(cert_file).read()
-    my_cert = crypto.load_certificate(crypto.FILETYPE_PEM, raw_cert)
-    return my_cert
-
-def verify_cert():
-    """
-    Check that the user cert is valid. 
-    things to check/return
-    not revoked
-    Expiry time warn if less than 21 days
-    """
-    my_cert = _open_cert()
-    serial_no = my_cert.get_serial_number()
-    valid_until = my_cert.get_notAfter()
-    crl = urlgrabber.urlread("https://admin.fedoraproject.org/ca/crl.pem")
-
-
-def certificate_expired():
-    """
-    Check to see if ~/.fedora.cert is expired
-    Returns True or False
-
-    """
-    my_cert = _open_cert()
-
-    if my_cert.has_expired():
-        return True
-    else:
-        return False
-
-def read_user_cert():
-    """
-    Figure out the Fedora user name from ~/.fedora.cert
-
-    """
-    my_cert = _open_cert()
+    FILE = open(cert_file)
+    my_buf = FILE.read()
+    FILE.close()
+    my_cert = crypto.load_certificate(crypto.FILETYPE_PEM, my_buf)
 
     subject = str(my_cert.get_subject())
     subject_line = subject.split("CN=")
     cn_parts = subject_line[1].split("/")
     username = cn_parts[0]
-    if certificate_expired():
+
+    if my_cert.has_expired():
         print "Certificate expired; Lets get a new one."
         create_user_cert(username)
 
     return username
 
+
 def create_user_cert(username):
-    if not username:
+    if not username is None:
         username = raw_input('FAS Username: ')
     password = getpass.getpass('FAS Password: ')
     try:
@@ -87,9 +56,7 @@ def create_user_cert(username):
         sys.exit(1)
     cert_file = os.path.join(os.path.expanduser('~'), ".fedora.cert")
     if not os.access(cert_file, os.W_OK):
-        print """Can not open cert file for writing.
-Please paste certificate into ~/.fedora.cert"""
-       
+        print "Can not open cert file for writing"
         print cert
         sys.exit(1)
     else:
@@ -100,6 +67,7 @@ Please paste certificate into ~/.fedora.cert"""
 def main(opts):
     # lets read in the existing cert if it exists.
     # gets us existing acc info
+    print opts
     if not opts.username:
         try:
             username = read_user_cert()
@@ -110,7 +78,7 @@ def main(opts):
     else:
         username = opts.username
     #has cert expired? do we force a new cert? get a new one
-    if opts.newcert:
+    if opts.new_cert:
         print "Getting a new User Certificate"
         create_user_cert(username)
         sys.exit(0)
@@ -118,7 +86,7 @@ def main(opts):
         print "Certificate has expired, getting a new one"
         create_user_cert(username)
         sys.exit(0)
-    if opts.verifycert:
+    if opts.verify-cert:
         print "Verifying Certificate"
 
      
@@ -127,10 +95,10 @@ if __name__ == '__main__':
     opt_p.add_option('-u', '--username', action='store_true', dest='username',
                      default=False, help="FAS Username.")
     opt_p.add_option('-n', '--new-cert', action='store_true', dest='newcert',
-                     default=False, help="Generate a new Fedora Certificate.")
+                     help="Generate a new Fedora Certificate.")
     opt_p.add_option('-v', '--verify-cert', action='store_true', dest='verifycert',
-                     default=False, help="Verify Certificate.")
+                     help="Verify Certificate.")
 
-    (opts, args) = opt_p.parse_args()
+    opts = opt_p.parse_args()
 
     main(opts)
