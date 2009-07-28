@@ -1,3 +1,7 @@
+* Dennis Gilmore <dennis@ausil.us> - 0.3.6
+- default to annonymous checkout when there is no user cert RH BZ#514108
+- quote the passed arcuments to rpmbuild to make sure args get passed
+correctly RH BZ#513269
 * Dennis Gilmore <dennis@ausil.us> - 0.3.5
 - script for doing svn checkouts
 - add rpmbuild-md5
