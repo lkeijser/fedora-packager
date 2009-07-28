@@ -14,8 +14,12 @@ PKG_ROOT = 'cvs.fedoraproject.org:/cvs/pkgs'
 def read_cert_user():
     """Figure out the Fedora user name from ~/.fedora.cert. uses PyOpenSSL
     """
+    #if there is no user cert return None so that we default to anonymous checkout
+    if not os.access(cert_file, os.F_OK):
+        print "!!!    You don't have a ~/.fedora.cert file   !!!"
+        return None
 
-    # Make sure we can even read the thing.
+    # Make sure we can even read the user cert if its there 
     cert_file = os.path.join(os.path.expanduser('~'), ".fedora.cert")
     if not os.access(cert_file, os.R_OK):
         print "!!!    cannot read your ~/.fedora.cert file   !!!"
