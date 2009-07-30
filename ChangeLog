@@ -1,3 +1,5 @@
+* Dennis Gilmore <dennis@ausil.us> - 0.3.7
+- make sure user_cert is defined before refrencing it in fedora-cvs.py
 * Dennis Gilmore <dennis@ausil.us> - 0.3.6
 - default to annonymous checkout when there is no user cert RH BZ#514108
 - quote the passed arcuments to rpmbuild to make sure args get passed

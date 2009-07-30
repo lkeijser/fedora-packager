@@ -1,5 +1,5 @@
 Name:           fedora-packager
-Version:        0.3.4
+Version:        0.3.7
 Release:        1%{?dist}
 Summary:        Tools for setting up a fedora maintainer environment
 
@@ -13,6 +13,7 @@ Requires:       koji bodhi-client
 Requires:       rpm-build rpmdevtools rpmlint
 Requires:       mock cvs curl wget
 Requires:       pyOpenSSL python-pycurl
+Requires:       redhat-rpm-config
 
 BuildArch:      noarch
 
@@ -44,9 +45,30 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/fedoradev-pkgowners
 %{_bindir}/fedora-cert
 %{_bindir}/fedora-getsvn
+%{_bindir}/rpmbuild-md5
 
 
 %changelog
+* Thu Jul 30 2009 Dennis Gilmore <dennis@ausil.us> - 0.3.7-1
+- define user_cert in fedora-cvs before refrencing it 
+
+* Tue Jul 28 2009 Dennis Gilmore <dennis@ausil.us> - 0.3.6-1
+- use anon checkout when a fedora cert doesnt exist bz#514108
+- quote arguments passed onto rpmbuild bz#513269
+
+* Fri Jul 24 2009 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 0.3.5-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_12_Mass_Rebuild
+
+* Mon Jul 13 2009 Dennis Gilmore <dennis@ausil.us> - 0.3.5-1
+- add new rpmbuild-md5 script to build old style hash srpms
+- it is a wrapper around rpmbuild
+
+* Mon Jul  6 2009 Tom "spot" Callaway <tcallawa@redhat.com> - 0.3.4-3
+- add Requires: redhat-rpm-config to be sure fedora packagers are using all available macros
+
+* Wed Jun 24 2009 Dennis Gilmore <dennis@ausil.us> - 0.3.4-2
+- minor bump
+
 * Mon Jun 22 2009 Dennis Gilmore <dennis@ausil.us> - 0.3.4-1
 - update to 0.3.4 
 - bugfix release with some new scripts
