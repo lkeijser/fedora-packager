@@ -1,5 +1,5 @@
 Name:           fedora-packager
-Version:        0.3.7
+Version:        0.3.8
 Release:        1%{?dist}
 Summary:        Tools for setting up a fedora maintainer environment
 
@@ -14,6 +14,7 @@ Requires:       rpm-build rpmdevtools rpmlint
 Requires:       mock cvs curl wget
 Requires:       pyOpenSSL python-pycurl
 Requires:       redhat-rpm-config
+Requires:       offtrac
 
 BuildArch:      noarch
 
@@ -45,10 +46,14 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/fedoradev-pkgowners
 %{_bindir}/fedora-cert
 %{_bindir}/fedora-getsvn
+%{_bindir}/fedora-hosted
 %{_bindir}/rpmbuild-md5
 
 
 %changelog
+* Tue Aug 04 2009 Jesse Keating <jkeating@redhat.com> - 0.3.8-1
+- Add fedora-hosted and require offtrac
+
 * Thu Jul 30 2009 Dennis Gilmore <dennis@ausil.us> - 0.3.7-1
 - define user_cert in fedora-cvs before refrencing it 
 

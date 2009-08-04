@@ -1,3 +1,6 @@
+Aug 04 2009
+add fedora-hosted, a cli interface to our Trac setup
+
 Jul 13 2009
 add rpmbuild-md5  it creates rpms with old style hashes
 
