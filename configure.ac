@@ -1,4 +1,4 @@
-AC_INIT([fedora-packager], [0.4.0])
+AC_INIT([fedora-packager], [0.3.7])
 AM_INIT_AUTOMAKE([dist-bzip2 no-dist-gzip])
 AC_PATH_PROGS(PYTHON, python)
 AC_PATH_PROGS(BASH, sh bash)
