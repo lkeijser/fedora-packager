@@ -1,6 +1,6 @@
 bin_SCRIPTS = fedora-cvs fedora-packager-setup fedoradev-pkgowners fedora-cert fedora-getsvn fedora-hosted rpmbuild-md5
 CLEANFILES = $(bin_SCRIPTS)
-EXTRA_DIST = src/fedora-cvs.py src/fedora-packager-setup.py src/fedoradev-pkgowners src/fedora-cert.py src/fedora-getsvn fedora-hosted src/rpmbuild-md5
+EXTRA_DIST = src/fedora-cvs.py src/fedora-packager-setup.py src/fedoradev-pkgowners src/fedora-cert.py src/fedora-getsvn src/fedora-hosted.py src/rpmbuild-md5
 
 fedora-cvs: $(srcdir)/src/fedora-cvs.py
 	rm -f fedora-cvs
@@ -27,9 +27,9 @@ fedora-getsvn: $(srcdir)/src/fedora-getsvn
 	cp -p $(srcdir)/src/fedora-getsvn fedora-getsvn
 	chmod ugo+x fedora-getsvn
 
-fedora-hosted: $(srcdir)/src/fedora-hosted
+fedora-hosted: $(srcdir)/src/fedora-hosted.py
 	rm -f fedora-hosted
-	cp -p $(srcdir)/src/fedora-getsvn fedora-hosted
+	cp -p $(srcdir)/src/fedora-hosted.py fedora-hosted
 	chmod ugo+x fedora-hosted
 
 rpmbuild-md5: $(srcdir)/src/rpmbuild-md5
