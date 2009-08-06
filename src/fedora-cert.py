@@ -72,7 +72,7 @@ def create_user_cert(username):
         username = raw_input('FAS Username: ')
     password = getpass.getpass('FAS Password: ')
     try:
-        fas = AccountSystem('https://admin.fedoraproject.org/', username, password)
+        fas = AccountSystem('https://admin.fedoraproject.org/accounts/', username=username, password=password)
     except AuthError:
         print "Invalid username/password."
         sys.exit(1)
