@@ -86,16 +86,16 @@ def create_user_cert(username):
         fas.logout()
         sys.exit(1)
     cert_file = os.path.join(os.path.expanduser('~'), ".fedora.cert")
-    if not os.access(cert_file, os.W_OK):
+    try:
+        FILE = open(cert_file,"w")
+        FILE.write(cert)
+        FILE.close()
+    except:
         print """Can not open cert file for writing.
 Please paste certificate into ~/.fedora.cert"""
        
         print cert
         sys.exit(1)
-    else:
-        FILE = open(cert_file,"w")
-        FILE.write(cert)
-        FILE.close()
 
 def main(opts):
     # lets read in the existing cert if it exists.
