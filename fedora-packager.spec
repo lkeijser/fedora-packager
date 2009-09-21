@@ -14,7 +14,7 @@ Requires:       rpm-build rpmdevtools rpmlint
 Requires:       mock cvs curl wget
 Requires:       pyOpenSSL python-pycurl
 Requires:       redhat-rpm-config
-Requires:       offtrac
+Requires:       python-offtrac
 
 BuildArch:      noarch
 

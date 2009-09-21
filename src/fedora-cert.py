@@ -124,7 +124,7 @@ def main(opts):
      
 if __name__ == '__main__':
     opt_p = optparse.OptionParser(usage="%prog [OPTIONS] ")
-    opt_p.add_option('-u', '--username', action='store_true', dest='username',
+    opt_p.add_option('-u', '--username', action='store', dest='username',
                      default=False, help="FAS Username.")
     opt_p.add_option('-n', '--new-cert', action='store_true', dest='newcert',
                      default=False, help="Generate a new Fedora Certificate.")
