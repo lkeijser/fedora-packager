@@ -118,7 +118,7 @@ Please download one by running "fedora-cert -n" and re-running this script'''
         os.symlink(server_ca_cert, upload_ca_cert)
     if not os.path.isdir(os.path.join(user_home, '.koji')):
         os.mkdir(os.path.join(user_home, '.koji'))
-    for arch in ['sparc', 'arm', 'alpha', 'ia64', 's390', 'hppa', 'ppc']:
+    for arch in ['sparc', 'arm', 'alpha', 's390', 'hppa', 'ppc']:
         config_file = '%s/.koji/%s-config' % (user_home, arch)
         if not  os.path.isfile(config_file):
             write_arch_config(arch, config_file)
