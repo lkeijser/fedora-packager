@@ -204,7 +204,48 @@ class PackageModule:
         except subprocess.CalledProcessError, e:
             raise FedpkgError(e)
         return output[0]
-        
+
+    def local(self, arch=None, hashtype='sha256'):
+        """rpmbuild locally for given arch.
+
+        Takes arch to build for, and hashtype to build with.
+
+        Writes output to a log file and returns output from build.
+
+        """
+
+        # Get the sources
+        self.sources()
+        # Determine arch to build for
+        if not arch:
+            arch = self.localarch
+        # build up the rpm command
+        cmd = ['rpmbuild']
+        cmd.extend(self.rpmdefines)
+        # This may need to get updated if we ever change our checksum default
+        if not hashtype == 'sha256':
+            cmd.extend(['--define',
+                        '_source_filedigest_algorithm %s' % hashtype,
+                        '--define',
+                        '_binary_filedigest_algorithm %s' % hashtype])
+        cmd.extend(['--target', arch, '-ba',
+                    os.path.join(self.path, self.spec)])
+        try:
+            proc = subprocess.Popen(cmd, stderr=subprocess.STDOUT,
+                                    stdout=subprocess.PIPE)
+            output = proc.communicate()
+        except OSError, e:
+            raise FedpkgError(e)
+        outfile = open(os.path.join(self.path, '.build-%s-%s.log' % (self.ver,
+                       self.rel)), 'w')
+        outfile.writelines(output[0])
+        outfile.close()
+        # See if we had a good return or not, raise accordingly
+        if proc.returncode:
+            raise FedpkgError('%s returned %s: %s' %
+                              (subprocess.list2cmdline(cmd),
+                               proc.returncode, output[0]))
+        return output[0]
 
     def new_sources(self, files):
         """Replace source file(s) in the lookaside cache"""
