@@ -102,6 +102,12 @@ class PackageModule:
         branch = open(os.path.join(self.path, 'branch'), 'r').read().strip()
         return branch
 
+    def _getlocalarch(self):
+        """Get the local arch as defined by rpm"""
+        
+        return subprocess.Popen(['rpm', '--eval', '%{_arch}'],
+                                stdout=subprocess.PIPE).communicate()[0]
+
     def __init__(self, path=os.curdir):
         # Initiate a PackageModule object in a given path
         # Set some global variables used throughout
@@ -140,6 +146,7 @@ class PackageModule:
                            '--define', '%s 1' % self.distvar]
         self.ver = self.getver()
         self.rel = self.getrel()
+        self.localarch = self._getlocalarch()
 
     def getver(self):
         """Return the version-release of a package module."""
@@ -186,7 +193,7 @@ class PackageModule:
         # Make sure we have a srpm to run on
         srpm = "%s-%s-%s.src.rpm" % (self.module, self.ver, self.rel)
         rpm = "%s-%s-%s.%s.rpm" % (self.module, self.ver, self.rel,
-                                   os.uname()[4])
+                                   self.localarch)
         if not os.path.exists(os.path.join(self.path, srpm)) and not \
           os.path.exists(os.path.join(self.path, rpm)):
             raise FedpkgError('Need to build srpm and rpm first')
