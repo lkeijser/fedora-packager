@@ -66,7 +66,11 @@ def install(args):
 
 def lint(args):
     mymodule = fedpkg.PackageModule(args.path)
-    print(mymodule.lint())
+    try:
+        print(mymodule.lint())
+    except fedpkg.FedpkgError, e:
+        print('Could not run rpmlint: %s' % e)
+        return 1
 
 def local(args):
     # not implimented
