@@ -19,6 +19,10 @@ LOOKASIDE = 'http://cvs.fedoraproject.org/repo/pkgs'
 LOOKASIDEHASH = 'md5'
 GITBASEURL = 'ssh://%(user)s@pkgs.stg.fedoraproject.org/%(module)s'
 
+# Define our own error class
+class FedpkgError(Exception):
+    pass
+
 # Define some helper functions, they start with _
 def _hash_file(file, hashtype):
     """Return the hash of a file given a hash type"""
@@ -187,7 +191,7 @@ class PackageModule:
                                    os.uname()[4])
         if not os.path.exists(os.path.join(self.path, srpm)) and not \
           os.path.exists(os.path.join(self.path, rpm)):
-            return "Need to build srpm and rpm first"
+            raise FedpkgError("Need to build srpm and rpm first")
         cmd = ['rpmlint', os.path.join(self.path, srpm),
                os.path.join(self.path, rpm)]
         output = subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()
