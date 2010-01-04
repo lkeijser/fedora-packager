@@ -96,6 +96,7 @@ def clone_with_dirs(module, user):
 class PackageModule:
     def _findbranch(self):
         """Find the branch we're on"""
+
         if not os.path.exists(os.path.join(self.path, 'branch')):
             return 'devel'
         branch = open(os.path.join(self.path, 'branch'), 'r').read().strip()
@@ -261,7 +262,7 @@ class PackageModule:
         Requires sources already downloaded.
     
         """
-    
+
         cmd = ['rpmbuild']
         cmd.extend(self.rpmdefines)
         # This may need to get updated if we ever change our checksum default
