@@ -151,7 +151,7 @@ class PackageModule:
             output = subprocess.Popen(cmd,
                                       stdout=subprocess.PIPE).communicate()
         except subprocess.CalledProcessError, e:
-            raise FedpkgError('Could not get version-release of %s: %s' % (self.module, e))
+            raise FedpkgError('Could not get version of %s: %s' % (self.module, e))
         return output[0]
 
     def getrel(self):
@@ -165,7 +165,7 @@ class PackageModule:
             output = subprocess.Popen(cmd,
                                       stdout=subprocess.PIPE).communicate()
         except subprocess.CalledProcessError, e:
-            raise FedpkgError('Could not get version-release of %s: %s' % (self.module, e))
+            raise FedpkgError('Could not get release of %s: %s' % (self.module, e))
         return output[0]
 
     def gimmespec(self):
