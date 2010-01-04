@@ -134,6 +134,38 @@ class PackageModule:
                            '--define', 'dist %s' % self.dist,
                            '--define', '%s %s' % (self.distvar, self.distval),
                            '--define', '%s 1' % self.distvar]
+        self.ver = self.getver()
+        self.rel = self.getrel()
+
+    def getver(self):
+        """Return the version-release of a package module."""
+
+        cmd = ['rpm']
+        cmd.extend(self.rpmdefines)
+        cmd.extend(['-q', '--qf', '%{VERSION}', '--specfile',
+                    os.path.join(self.path, self.spec)])
+        try:
+            output = subprocess.Popen(cmd,
+                                      stdout=subprocess.PIPE).communicate()
+        except subprocess.CalledProcessError, e:
+            print("Could not get version-release of %s: %s" % (self.module, e))
+            return 1
+        return output[0]
+
+    def getrel(self):
+        """Return the version-release of a package module."""
+
+        cmd = ['rpm']
+        cmd.extend(self.rpmdefines)
+        cmd.extend(['-q', '--qf', '%{RELEASE}', '--specfile',
+                    os.path.join(self.path, self.spec)])
+        try:
+            output = subprocess.Popen(cmd,
+                                      stdout=subprocess.PIPE).communicate()
+        except subprocess.CalledProcessError, e:
+            print("Could not get version-release of %s: %s" % (self.module, e))
+            return 1
+        return output[0]
 
     def gimmespec(self):
         """Print the name of a specfile within a package module"""
