@@ -65,8 +65,8 @@ def install(args):
     print('Not implimented yet, got %s' % args)
 
 def lint(args):
-    # not implimented
-    print('Not implimented yet, got %s' % args)
+    mymodule = fedpkg.PackageModule(args.path)
+    print(mymodule.lint())
 
 def local(args):
     # not implimented
