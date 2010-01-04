@@ -301,7 +301,8 @@ if __name__ == '__main__':
 
     # Get version and release
     parser_verrel = subparsers.add_parser('verrel',
-                                          help = 'Print the version-release')
+                                          help = 'Print the'
+                                          ' name-version-release')
     parser_verrel.set_defaults(command = verrel)
 
     # Parse the args and run the necessary command
