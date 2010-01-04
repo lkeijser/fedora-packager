@@ -77,8 +77,15 @@ def lint(args):
         return 1
 
 def local(args):
-    # not implimented
-    print('Not implimented yet, got %s' % args)
+    arch = None
+    if args.arch:
+        arch = args.arch
+    try:
+        mymodule = fedpkg.PackageModule(args.path)
+        print(mymodule.local(arch=arch))
+    except fedpkg.FedpkgError, e:
+        print('Could not build locally: %s' % e)
+        return 1
 
 def mockbuild(args):
     # not implimented
@@ -239,6 +246,7 @@ if __name__ == '__main__':
     # Build locally
     parser_local = subparsers.add_parser('local',
                                          help = 'Local test rpmbuild binary')
+    parser_local.add_argument('--arch', help = 'Build for arch')
     parser_local.set_defaults(command = local)
 
     # Build in mock
