@@ -194,7 +194,10 @@ class PackageModule:
             raise FedpkgError("Need to build srpm and rpm first")
         cmd = ['rpmlint', os.path.join(self.path, srpm),
                os.path.join(self.path, rpm)]
-        output = subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()
+        try:
+            output = subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()
+        except subprocess.CalledProcessError, e:
+            raise FedpkgError(e)
         return output[0]
         
 
