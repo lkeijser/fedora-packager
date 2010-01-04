@@ -30,8 +30,7 @@ def _hash_file(file, hashtype):
     try:
         sum = hashlib.new(hashtype)
     except ValueError:
-        print("Invalid hash type: 0%s" % hashtype)
-        return False
+        raise FedpkgError('Invalid hash type: %s' % hashtype)
 
     input = open(file, 'rb')
     # Loop through the file reading chunks at a time as to not
@@ -152,8 +151,7 @@ class PackageModule:
             output = subprocess.Popen(cmd,
                                       stdout=subprocess.PIPE).communicate()
         except subprocess.CalledProcessError, e:
-            print("Could not get version-release of %s: %s" % (self.module, e))
-            return 1
+            raise FedpkgError('Could not get version-release of %s: %s' % (self.module, e))
         return output[0]
 
     def getrel(self):
@@ -167,8 +165,7 @@ class PackageModule:
             output = subprocess.Popen(cmd,
                                       stdout=subprocess.PIPE).communicate()
         except subprocess.CalledProcessError, e:
-            print("Could not get version-release of %s: %s" % (self.module, e))
-            return 1
+            raise FedpkgError('Could not get version-release of %s: %s' % (self.module, e))
         return output[0]
 
     def gimmespec(self):
@@ -180,7 +177,7 @@ class PackageModule:
         for f in files:
             if f.endswith('.spec'):
                 return f
-        return None
+        raise FedpkgError('No spec file found.')
 
     def lint(self):
         """Run rpmlint over a built srpm"""
@@ -191,7 +188,7 @@ class PackageModule:
                                    os.uname()[4])
         if not os.path.exists(os.path.join(self.path, srpm)) and not \
           os.path.exists(os.path.join(self.path, rpm)):
-            raise FedpkgError("Need to build srpm and rpm first")
+            raise FedpkgError('Need to build srpm and rpm first')
         cmd = ['rpmlint', os.path.join(self.path, srpm),
                os.path.join(self.path, rpm)]
         try:
@@ -253,11 +250,9 @@ class PackageModule:
             try:
                 subprocess.check_call(command, cwd=outdir)
             except subprocess.CalledProcessError, e:
-                print "Could not download %s: %s" % (url, e)
-                return 1
+                raise FedpkgError('Could not download %s: %s' % (url, e))
             if not _verify_file(outfile, csum, self.lookasidehash):
-                print "%s failed checksum" % file
-                return 1
+                raise FedpkgError('%s failed checksum' % file)
         return
 
     def srpm(self, hashtype='sha256'):
@@ -279,6 +274,5 @@ class PackageModule:
         try:
             subprocess.check_call(cmd)
         except subprocess.CalledProcessError, e:
-            print "Could not build %s: %s" % (self.module, e)
-            return 1
+            raise FedpkgError('Could not build %s: %s' % (self.module, e))
         return
