@@ -178,6 +178,22 @@ class PackageModule:
                 return f
         return None
 
+    def lint(self):
+        """Run rpmlint over a built srpm"""
+
+        # Make sure we have a srpm to run on
+        srpm = "%s-%s-%s.src.rpm" % (self.module, self.ver, self.rel)
+        rpm = "%s-%s-%s.%s.rpm" % (self.module, self.ver, self.rel,
+                                   os.uname()[4])
+        if not os.path.exists(os.path.join(self.path, srpm)) and not \
+          os.path.exists(os.path.join(self.path, rpm)):
+            return "Need to build srpm and rpm first"
+        cmd = ['rpmlint', os.path.join(self.path, srpm),
+               os.path.join(self.path, rpm)]
+        output = subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()
+        return output[0]
+        
+
     def new_sources(self, files):
         """Replace source file(s) in the lookaside cache"""
     
