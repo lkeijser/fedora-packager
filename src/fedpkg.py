@@ -125,8 +125,8 @@ def update(args):
     print('Not implimented yet, got %s' % args)
 
 def verrel(args):
-    # not implimented
-    print('Not implimented yet, got %s' % args)
+    mymodule = fedpkg.PackageModule(args.path)
+    print('%s-%s' % (mymodule.ver, mymodule.rel))
 
 # THe main code goes here
 if __name__ == '__main__':
