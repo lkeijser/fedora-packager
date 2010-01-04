@@ -57,16 +57,20 @@ def export(args):
     print('Not implimented yet, got %s' % args)
 
 def gimmespec(args):
-    mymodule = fedpkg.PackageModule(args.path)
-    print(mymodule.spec)
+    try:
+        mymodule = fedpkg.PackageModule(args.path)
+        print(mymodule.spec)
+    except fedpkg.FedpkgError, e:
+        print('Could not get spec file: %s' % e)
+        return 1
 
 def install(args):
     # not implimented
     print('Not implimented yet, got %s' % args)
 
 def lint(args):
-    mymodule = fedpkg.PackageModule(args.path)
     try:
+        mymodule = fedpkg.PackageModule(args.path)
         print(mymodule.lint())
     except fedpkg.FedpkgError, e:
         print('Could not run rpmlint: %s' % e)
@@ -101,16 +105,24 @@ def scratchbuild(args):
     print('Not implimented yet, got %s' % args)
 
 def sources(args):
-    mymodule = fedpkg.PackageModule(args.path)
-    mymodule.sources(args.outdir)
+    try:
+        mymodule = fedpkg.PackageModule(args.path)
+        mymodule.sources(args.outdir)
+    except fedpkg.FedpkgError, e:
+        print('Could not download sources: %s' % e)
+        return 1
 
 def srpm(args):
-    mymodule = fedpkg.PackageModule(args.path)
-    mymodule.sources(args.path)
-    if args.md5:
-        mymodule.srpm('md5')
-    else:
-        mymodule.srpm()
+    try:
+        mymodule = fedpkg.PackageModule(args.path)
+        mymodule.sources(args.path)
+        if args.md5:
+            mymodule.srpm('md5')
+        else:
+            mymodule.srpm()
+    except fedpkg.FedpkgError, e:
+        print('Could not make an srpm: %s' % e)
+        return 1
 
 def tagrequest(args):
     # not implimented
