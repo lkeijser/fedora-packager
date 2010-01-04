@@ -126,7 +126,7 @@ def update(args):
 
 def verrel(args):
     mymodule = fedpkg.PackageModule(args.path)
-    print('%s-%s' % (mymodule.ver, mymodule.rel))
+    print('%s-%s-%s' % (mymodule.module, mymodule.ver, mymodule.rel))
 
 # THe main code goes here
 if __name__ == '__main__':
