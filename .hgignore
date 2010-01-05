@@ -14,3 +14,6 @@ install-sh
 missing
 fedora-cvs
 fedora-packager-setup
+.project
+.pydevproject
+*.pyc
