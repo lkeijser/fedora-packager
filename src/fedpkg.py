@@ -13,6 +13,7 @@
 import argparse
 import fedpkg
 import os
+import sys
 
 # Add a simple function to print usage, for the 'help' command
 def usage(args):
@@ -151,7 +152,11 @@ def update(args):
     print('Not implimented yet, got %s' % args)
 
 def verrel(args):
-    mymodule = fedpkg.PackageModule(args.path)
+    try:
+        mymodule = fedpkg.PackageModule(args.path)
+    except fedpkg.FedpkgError, e:
+        print('Could not get ver-rel: %s' % e)
+        sys.exit(1)
     print('%s-%s-%s' % (mymodule.module, mymodule.ver, mymodule.rel))
 
 # THe main code goes here
