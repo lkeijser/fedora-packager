@@ -105,8 +105,8 @@ class PackageModule:
     def _getlocalarch(self):
         """Get the local arch as defined by rpm"""
         
-        return subprocess.Popen(['rpm', '--eval', '%{_arch}'],
-                                stdout=subprocess.PIPE).communicate()[0]
+        return subprocess.Popen(['rpm --eval %{_arch}'], shell=True,
+                        stdout=subprocess.PIPE).communicate()[0].strip('\n')
 
     def __init__(self, path=os.curdir):
         # Initiate a PackageModule object in a given path
@@ -136,14 +136,14 @@ class PackageModule:
             self.distval = '13' # this is hardset for now, which is bad
             self.distvar = 'fedora'
             self.dist = '.fc%s' % self.distval
-        self.rpmdefines = ['--define', '_sourcedir %s' % path,
-                           '--define', '_specdir %s' % path,
-                           '--define', '_builddir %s' % path,
-                           '--define', '_srcrpmdir %s' % path,
-                           '--define', '_rpmdir %s' % path,
-                           '--define', 'dist %s' % self.dist,
-                           '--define', '%s %s' % (self.distvar, self.distval),
-                           '--define', '%s 1' % self.distvar]
+        self.rpmdefines = ["--define '_sourcedir %s'" % path,
+                           "--define '_specdir %s'" % path,
+                           "--define '_builddir %s'" % path,
+                           "--define '_srcrpmdir %s'" % path,
+                           "--define '_rpmdir %s'" % path,
+                           "--define 'dist %s'" % self.dist,
+                           "--define '%s %s'" % (self.distvar, self.distval),
+                           "--define '%s 1'" % self.distvar]
         self.ver = self.getver()
         self.rel = self.getrel()
         self.localarch = self._getlocalarch()
@@ -156,7 +156,7 @@ class PackageModule:
         cmd.extend(['-q', '--qf', '%{VERSION}', '--specfile',
                     os.path.join(self.path, self.spec)])
         try:
-            output = subprocess.Popen(cmd,
+            output = subprocess.Popen(' '.join(cmd), shell=True,
                                       stdout=subprocess.PIPE).communicate()
         except subprocess.CalledProcessError, e:
             raise FedpkgError('Could not get version of %s: %s' % (self.module, e))
@@ -170,7 +170,7 @@ class PackageModule:
         cmd.extend(['-q', '--qf', '%{RELEASE}', '--specfile',
                     os.path.join(self.path, self.spec)])
         try:
-            output = subprocess.Popen(cmd,
+            output = subprocess.Popen(' '.join(cmd), shell=True,
                                       stdout=subprocess.PIPE).communicate()
         except subprocess.CalledProcessError, e:
             raise FedpkgError('Could not get release of %s: %s' % (self.module, e))
@@ -224,15 +224,13 @@ class PackageModule:
         cmd.extend(self.rpmdefines)
         # This may need to get updated if we ever change our checksum default
         if not hashtype == 'sha256':
-            cmd.extend(['--define',
-                        '_source_filedigest_algorithm %s' % hashtype,
-                        '--define',
-                        '_binary_filedigest_algorithm %s' % hashtype])
+            cmd.extend(["--define '_source_filedigest_algorithm %s'" % hashtype,
+                        "--define '_binary_filedigest_algorithm %s'" % hashtype])
         cmd.extend(['--target', arch, '-ba',
                     os.path.join(self.path, self.spec)])
         try:
-            proc = subprocess.Popen(cmd, stderr=subprocess.STDOUT,
-                                    stdout=subprocess.PIPE)
+            proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.STDOUT,
+                                    stdout=subprocess.PIPE, shell=True)
             output = proc.communicate()
         except OSError, e:
             raise FedpkgError(e)
@@ -315,13 +313,11 @@ class PackageModule:
         cmd.extend(self.rpmdefines)
         # This may need to get updated if we ever change our checksum default
         if not hashtype == 'sha256':
-            cmd.extend(['--define',
-                        '_source_filedigest_algorithm %s' % hashtype,
-                        '--define',
-                        '_binary_filedigest_algorithm %s' % hashtype])
+            cmd.extend(["--define '_source_filedigest_algorithm %s'" % hashtype,
+                    "--define '_binary_filedigest_algorithm %s'" % hashtype])
         cmd.extend(['--nodeps', '-bs', os.path.join(self.path, self.spec)])
         try:
-            subprocess.check_call(cmd)
+            subprocess.check_call(' '.join(cmd), shell=True)
         except subprocess.CalledProcessError, e:
             raise FedpkgError('Could not build %s: %s' % (self.module, e))
         return
