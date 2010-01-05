@@ -82,7 +82,10 @@ def local(args):
         arch = args.arch
     try:
         mymodule = fedpkg.PackageModule(args.path)
-        print(mymodule.local(arch=arch))
+        if args.md5:
+            print(mymodule.local(arch=arch, hashtype='md5'))
+        else:
+            print(mymodule.local(arch=arch))
     except fedpkg.FedpkgError, e:
         print('Could not build locally: %s' % e)
         return 1
@@ -247,6 +250,9 @@ if __name__ == '__main__':
     parser_local = subparsers.add_parser('local',
                                          help = 'Local test rpmbuild binary')
     parser_local.add_argument('--arch', help = 'Build for arch')
+    # optionally define old style hashsums
+    parser_local.add_argument('--md5', action = 'store_true',
+                              help = 'Use md5 checksums (for older rpm hosts)')
     parser_local.set_defaults(command = local)
 
     # Build in mock
