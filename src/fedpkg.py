@@ -112,8 +112,15 @@ def patch(args):
     print('Not implimented yet, got %s' % args)
 
 def prep(args):
-    # not implimented
-    print('Not implimented yet, got %s' % args)
+    arch = None
+    if args.arch:
+        arch = args.arch
+    try:
+        mymodule = fedpkg.PackageModule(args.path)
+        print(mymodule.prep(arch=arch))
+    except fedpkg.FedpkgError, e:
+        print('Could not prep: %s' % e)
+        sys.exit(1)
 
 def scratchbuild(args):
     # not implimented
@@ -291,6 +298,7 @@ if __name__ == '__main__':
     # Prep locally
     parser_prep = subparsers.add_parser('prep',
                                         help = 'Local test rpmbuild prep')
+    parser_prep.add_argument('--arch', help = 'Prep for a specific arch')
     parser_prep.set_defaults(command = prep)
 
     # scratch build
