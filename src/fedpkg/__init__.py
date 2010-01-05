@@ -13,6 +13,8 @@ import os
 #import pycurl
 import subprocess
 import hashlib
+import koji
+import rpm
 
 # Define some global variables, put them here to make it easy to change
 LOOKASIDE = 'http://cvs.fedoraproject.org/repo/pkgs'
@@ -56,6 +58,38 @@ def _verify_file(file, hash, hashtype):
     if sum == hash:
         return True
     return False
+
+def _get_build_arches_from_srpm(srpm, arches):
+    """Given the path to an srpm, determine the possible build arches
+
+    Use supplied arches as a filter, only return compatible arches
+
+    """
+
+    archlist = arches
+    hdr = koji.get_rpm_header(srpm)
+    if hdr[rpm.RPMTAG_SOURCEPACKAGE] != 1:
+        raise FedpkgError('%s is not a source package.' % srpm)
+    buildarchs = hdr[rpm.RPMTAG_BUILDARCHS]
+    exclusivearch = hdr[rpm.RPMTAG_EXCLUSIVEARCH]
+    excludearch = hdr[rpm.RPMTAG_EXCLUDEARCH]
+    # Reduce by buildarchs
+    if buildarchs:
+        archlist = [a for a in archlist if a in buildarchs]
+    # Reduce by exclusive arches
+    if exclusivearch:
+        archlist = [a for a in archlist if a in exclusivearch]
+    # Reduce by exclude arch
+    if excludearch:
+        archlist = [a for a in archlist if a not in excludearch]
+    # do the noarch thing
+    if 'noarch' not in excludearch and ('noarch' in buildarchs or \
+                                        'noarch' in exclusivearch):
+        archlist.append('noarch')
+    # See if we have anything compatible.  Should we raise here?
+    if not archlist:
+        raise FedpkgError('No compatible build arches found in %s' % srpm)
+    return archlist
 
 def clone(module, user, branch=None):
     """Clone a repo, optionally check out a specific branch.
@@ -190,15 +224,20 @@ class PackageModule:
     def lint(self):
         """Run rpmlint over a built srpm"""
 
-        # Make sure we have a srpm to run on
+        # Make sure we have rpms to run on
         srpm = "%s-%s-%s.src.rpm" % (self.module, self.ver, self.rel)
-        rpm = "%s-%s-%s.%s.rpm" % (self.module, self.ver, self.rel,
-                                   self.localarch)
-        if not os.path.exists(os.path.join(self.path, srpm)) and not \
-          os.path.exists(os.path.join(self.path, rpm)):
+        if not os.path.exists(os.path.join(self.path, srpm)):
             raise FedpkgError('Need to build srpm and rpm first')
-        cmd = ['rpmlint', os.path.join(self.path, srpm),
-               os.path.join(self.path, rpm)]
+        # Get the possible built arches
+        arches = _get_build_arches_from_srpm(os.path.join(self.path, srpm),
+                                             [self.localarch])
+        rpms = []
+        for arch in arches:
+            rpms.extend([os.path.join(self.path, arch, file) for file in
+                         os.listdir(os.path.join(self.path, arch))
+                         if file.endswith('.rpm')])
+        cmd = ['rpmlint', os.path.join(self.path, srpm)]
+        cmd.extend(rpms)
         try:
             output = subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()
         except subprocess.CalledProcessError, e:
