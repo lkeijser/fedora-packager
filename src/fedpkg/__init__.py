@@ -293,6 +293,35 @@ class PackageModule:
             hash = _hash_file(file, self.lookasidehash)
             print "Would upload %s:%s" % (hash, file)
         return
+
+    def prep(self, arch=None):
+        """Run rpm -bp on a module
+
+        optionally for a specific arch
+
+        Returns the output"""
+
+        # Get the sources
+        self.sources()
+        # setup the rpm command
+        cmd = ['rpmbuild']
+        cmd.extend(self.rpmdefines)
+        if arch:
+            cmd.extend(['--target', arch])
+        cmd.extend(['--nodeps', '-bp', os.path.join(self.path, self.spec)])
+        # Run the command and capture output
+        try:
+            proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.STDOUT,
+                                    stdout=subprocess.PIPE, shell=True)
+            output = proc.communicate()
+        except OSError, e:
+            raise FedpkgError(e)
+        # See if we exited cleanly
+        if proc.returncode:
+            raise FedpkgError('%s returned %s: %s' %
+                              (subprocess.list2cmdline(cmd),
+                               proc.returncode, output[0]))
+        return output[0]
                
     def sources(self, outdir=None):
         """Download source files"""
