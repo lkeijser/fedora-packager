@@ -76,8 +76,18 @@ def gimmespec(args):
         sys.exit(1)
 
 def install(args):
-    # not implimented
-    print('Not implimented yet, got %s' % args)
+    arch = None
+    short = False
+    if args.arch:
+        arch = args.arch
+    if args.short_circuit:
+        short = True
+    try:
+        mymodule = fedpkg.PackageModule(args.path)
+        print(mymodule.install(arch=arch, short=short))
+    except fedpkg.FedpkgError, e:
+        print('Could not install: %s' % e)
+        sys.exit(1)
 
 def lint(args):
     try:
@@ -264,6 +274,7 @@ if __name__ == '__main__':
     # install locally
     parser_install = subparsers.add_parser('install',
                                         help = 'Local test rpmbuild install')
+    parser_install.add_argument('--arch', help = 'Arch to install for')
     parser_install.add_argument('--short-circuit', action = 'store_true',
                                 help = 'short-circuit install')
     parser_install.set_defaults(command = install)
