@@ -50,8 +50,18 @@ def clone(args):
         fedpkg.clone(args.module, args.user, args.branch)
 
 def compile(args):
-    # not implimented
-    print('Not implimented yet, got %s' % args)
+    arch = None
+    short = False
+    if args.arch:
+        arch = args.arch
+    if args.short_circuit:
+        short = True
+    try:
+        mymodule = fedpkg.PackageModule(args.path)
+        print(mymodule.compile(arch=arch, short=short))
+    except fedpkg.FedpkgError, e:
+        print('Could not compile: %s' % e)
+        sys.exit(1)
 
 def export(args):
     # not implimented
@@ -236,6 +246,7 @@ if __name__ == '__main__':
     # compile locally
     parser_compile = subparsers.add_parser('compile',
                                         help = 'Local test rpmbuild compile')
+    parser_compile.add_argument('--arch', help = 'Arch to compile for')
     parser_compile.add_argument('--short-circuit', action = 'store_true',
                                 help = 'short-circuit compile')
     parser_compile.set_defaults(command = compile)
