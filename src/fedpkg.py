@@ -100,8 +100,12 @@ def new(args):
     print('Not implimented yet, got %s' % args)
 
 def new_sources(args):
-    mymodule = fedpkg.PackageModule(args.path)
-    mymodule.new_sources(args.files)
+    try:
+        mymodule = fedpkg.PackageModule(args.path)
+        mymodule.new_sources(args.files)
+    except fedpkg.FedpkgError, e:
+        print('Could not upload new sources: %s' % e)
+        sys.exit(1)
 
 def patch(args):
     # not implimented
