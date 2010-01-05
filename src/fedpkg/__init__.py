@@ -91,6 +91,37 @@ def _get_build_arches_from_srpm(srpm, arches):
         raise FedpkgError('No compatible build arches found in %s' % srpm)
     return archlist
 
+def clean(dry=False, useignore=True):
+    """Clean a module checkout of untracked files.
+
+    Can optionally perform a dry-run
+
+    Can optionally not use the ignore rules
+
+    Returns output
+
+    """
+
+    # setup the command, this could probably be done with some python api...
+    cmd = ['git', 'clean', '-f', '-d']
+    if dry:
+        cmd.append('--dry-run')
+    if not useignore:
+        cmd.append('-x')
+    # Run it!
+    try:
+        proc = subprocess.Popen(cmd, stderr=subprocess.STDOUT,
+                                stdout=subprocess.PIPE)
+        output = proc.communicate()
+    except OSError, e:
+        raise FedpkgError(e)
+    # See if we exited cleanly
+    if proc.returncode:
+        raise FedpkgError('%s returned %s: %s' %
+                          (subprocess.list2cmdline(cmd),
+                           proc.returncode, output[0]))
+    return output[0]
+
 def clone(module, user, branch=None):
     """Clone a repo, optionally check out a specific branch.
 
