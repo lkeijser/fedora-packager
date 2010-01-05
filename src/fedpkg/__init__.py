@@ -253,6 +253,7 @@ class PackageModule:
 
         """
 
+        # This could really use a list of arches to build for and loop over
         # Get the sources
         self.sources()
         # Determine arch to build for
