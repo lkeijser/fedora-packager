@@ -207,7 +207,7 @@ if __name__ == '__main__':
     # Let somebody override the username found in fedora cert
     parser.add_argument('-u', '--user')
     # Let the user define which path to look at instead of pwd
-    parser.add_argument('--path', default = os.curdir,
+    parser.add_argument('--path', default = os.getcwd(),
                     help='Directory to interact with instead of current dir')
     # Verbosity
     parser.add_argument('-v', action = 'count',

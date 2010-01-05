@@ -173,7 +173,7 @@ class PackageModule:
         return subprocess.Popen(['rpm --eval %{_arch}'], shell=True,
                         stdout=subprocess.PIPE).communicate()[0].strip('\n')
 
-    def __init__(self, path=os.curdir):
+    def __init__(self, path=os.getcwd()):
         # Initiate a PackageModule object in a given path
         # Set some global variables used throughout
         self.path = path
