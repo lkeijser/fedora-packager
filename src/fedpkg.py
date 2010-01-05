@@ -63,7 +63,7 @@ def gimmespec(args):
         print(mymodule.spec)
     except fedpkg.FedpkgError, e:
         print('Could not get spec file: %s' % e)
-        return 1
+        sys.exit(1)
 
 def install(args):
     # not implimented
@@ -75,7 +75,7 @@ def lint(args):
         print(mymodule.lint())
     except fedpkg.FedpkgError, e:
         print('Could not run rpmlint: %s' % e)
-        return 1
+        sys.exit(1)
 
 def local(args):
     arch = None
@@ -89,7 +89,7 @@ def local(args):
             print(mymodule.local(arch=arch))
     except fedpkg.FedpkgError, e:
         print('Could not build locally: %s' % e)
-        return 1
+        sys.exit(1)
 
 def mockbuild(args):
     # not implimented
@@ -121,7 +121,7 @@ def sources(args):
         mymodule.sources(args.outdir)
     except fedpkg.FedpkgError, e:
         print('Could not download sources: %s' % e)
-        return 1
+        sys.exit(1)
 
 def srpm(args):
     try:
@@ -133,7 +133,7 @@ def srpm(args):
             mymodule.srpm()
     except fedpkg.FedpkgError, e:
         print('Could not make an srpm: %s' % e)
-        return 1
+        sys.exit(1)
 
 def tagrequest(args):
     # not implimented
