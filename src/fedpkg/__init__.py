@@ -182,6 +182,37 @@ class PackageModule:
         self.rel = self.getrel()
         self.localarch = self._getlocalarch()
 
+    def compile(self, arch=None, short=False):
+        """Run rpm -bc on a module
+
+        optionally for a specific arch, or short-circuit it
+
+        Returns the output"""
+
+        # Get the sources
+        self.sources()
+        # setup the rpm command
+        cmd = ['rpmbuild']
+        cmd.extend(self.rpmdefines)
+        if arch:
+            cmd.extend(['--target', arch])
+        if short:
+            cmd.append('--short-circuit')
+        cmd.extend(['-bc', os.path.join(self.path, self.spec)])
+        # Run the command and capture output
+        try:
+            proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.STDOUT,
+                                    stdout=subprocess.PIPE, shell=True)
+            output = proc.communicate()
+        except OSError, e:
+            raise FedpkgError(e)
+        # See if we exited cleanly
+        if proc.returncode:
+            raise FedpkgError('%s returned %s: %s' %
+                              (subprocess.list2cmdline(cmd),
+                               proc.returncode, output[0]))
+        return output[0]
+
     def getver(self):
         """Return the version-release of a package module."""
 
