@@ -33,8 +33,16 @@ def check(args):
     print('Not implimented yet, got %s' % args)
 
 def clean(args):
-    # not implimented
-    print('Not implimented yet, got %s' % args)
+    dry = False
+    useignore = True
+    if args.dry_run:
+        dry = True
+    if args.x:
+        useignore = False
+    try:
+        print(fedpkg.clean(dry, useignore))
+    except fedpkg.FedpkgError, e:
+        print('Could not clean: %s' % e)
 
 def clog(args):
     # not implimented
@@ -231,6 +239,10 @@ if __name__ == '__main__':
     # clean things up
     parser_clean = subparsers.add_parser('clean',
                                          help = 'Remove untracked files')
+    parser_clean.add_argument('--dry-run', '-n', action = 'store_true',
+                              help = 'Perform a dry-run')
+    parser_clean.add_argument('-x', action = 'store_true',
+                              help = 'Do not follow .gitignore rules')
     parser_clean.set_defaults(command = clean)
 
     # Create a changelog stub
