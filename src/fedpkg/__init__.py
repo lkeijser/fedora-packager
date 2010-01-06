@@ -241,6 +241,36 @@ class PackageModule:
         self.rel = self.getrel()
         self.localarch = self._getlocalarch()
 
+    def clog(self):
+        """Write the latest spec changelog entry to a clog file"""
+
+        # This is a little ugly.  We want to find where %changelog starts,
+        # then only deal with the content up to the first empty newline.
+        # Then remove any lines that start with $ or %, and then replace
+        # %% with %
+
+        # This should probably change behavior from dist-cvs and not print
+        # the first line with the date/name/version as git has that info
+        # already and it would be redundant.
+
+        cloglines = []
+        spec = open(os.path.join(self.path, self.spec), 'r').readlines()
+        for line in spec:
+            if line.startswith('%changelog'):
+                # Grab all the lines below changelog
+                for line2 in spec[spec.index(line):]:
+                    if line2.startswith('\n'):
+                        break
+                    if line2.startswith('$'):
+                        continue
+                    if line2.startswith('%'):
+                        continue
+                    cloglines.append(line2.replace('%%', '%'))
+        # Now open the clog file and write out the lines
+        clogfile = open(os.path.join(self.path, 'clog'), 'w')
+        clogfile.writelines(cloglines)
+        return
+
     def compile(self, arch=None, short=False):
         """Run rpm -bc on a module
 
