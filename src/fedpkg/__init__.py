@@ -406,7 +406,7 @@ class PackageModule:
 
         optionally for a specific arch
 
-        Returns the output"""
+        Logs the output and returns the returncode from the prep call"""
 
         # Get the sources
         self.sources()
@@ -417,18 +417,15 @@ class PackageModule:
             cmd.extend(['--target', arch])
         cmd.extend(['--nodeps', '-bp', os.path.join(self.path, self.spec)])
         # Run the command and capture output
+        log.debug('Running: %s' % ' '.join(cmd))
         try:
             proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.STDOUT,
                                     stdout=subprocess.PIPE, shell=True)
             output = proc.communicate()
         except OSError, e:
             raise FedpkgError(e)
-        # See if we exited cleanly
-        if proc.returncode:
-            raise FedpkgError('%s returned %s: %s' %
-                              (subprocess.list2cmdline(cmd),
-                               proc.returncode, output[0]))
-        return output[0]
+        log.info(output[0])
+        return(proc.returncode)
                
     def sources(self, outdir=None):
         """Download source files"""
