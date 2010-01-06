@@ -15,6 +15,7 @@ import subprocess
 import hashlib
 import koji
 import rpm
+import logging
 
 # Define some global variables, put them here to make it easy to change
 LOOKASIDE = 'http://cvs.fedoraproject.org/repo/pkgs'
@@ -24,6 +25,19 @@ GITBASEURL = 'ssh://%(user)s@pkgs.stg.fedoraproject.org/%(module)s'
 # Define our own error class
 class FedpkgError(Exception):
     pass
+
+# Setup our logger
+# Null logger to avoid spurrious messages, add a handler in app code
+class NullHandler(logging.Handler):
+    def emit(self, record):
+        pass
+
+h = NullHandler()
+# This is our log object, clients of this library can use this object to
+# define their own logging needs
+log = logging.getLogger("fedpkg")
+# Add the null handler
+log.addHandler(h)
 
 # Define some helper functions, they start with _
 def _hash_file(file, hashtype):
