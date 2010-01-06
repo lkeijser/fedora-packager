@@ -41,9 +41,10 @@ def clean(args):
     if args.x:
         useignore = False
     try:
-        log.info(fedpkg.clean(dry, useignore))
+        return fedpkg.clean(dry, useignore)
     except fedpkg.FedpkgError, e:
         log.error('Could not clean: %s' % e)
+        sys.exit(1)
 
 def clog(args):
     # not implimented
@@ -67,7 +68,7 @@ def compile(args):
         short = True
     try:
         mymodule = fedpkg.PackageModule(args.path)
-        log.info(mymodule.compile(arch=arch, short=short))
+        return mymodule.compile(arch=arch, short=short)
     except fedpkg.FedpkgError, e:
         log.error('Could not compile: %s' % e)
         sys.exit(1)
@@ -93,7 +94,7 @@ def install(args):
         short = True
     try:
         mymodule = fedpkg.PackageModule(args.path)
-        log.info(mymodule.install(arch=arch, short=short))
+        return mymodule.install(arch=arch, short=short)
     except fedpkg.FedpkgError, e:
         log.error('Could not install: %s' % e)
         sys.exit(1)
@@ -101,7 +102,7 @@ def install(args):
 def lint(args):
     try:
         mymodule = fedpkg.PackageModule(args.path)
-        log.info(mymodule.lint())
+        return mymodule.lint()
     except fedpkg.FedpkgError, e:
         log.error('Could not run rpmlint: %s' % e)
         sys.exit(1)
@@ -113,9 +114,9 @@ def local(args):
     try:
         mymodule = fedpkg.PackageModule(args.path)
         if args.md5:
-            log.info(mymodule.local(arch=arch, hashtype='md5'))
+            return mymodule.local(arch=arch, hashtype='md5')
         else:
-            log.info(mymodule.local(arch=arch))
+            return mymodule.local(arch=arch)
     except fedpkg.FedpkgError, e:
         log.error('Could not build locally: %s' % e)
         sys.exit(1)
@@ -146,7 +147,7 @@ def prep(args):
         arch = args.arch
     try:
         mymodule = fedpkg.PackageModule(args.path)
-        log.info(mymodule.prep(arch=arch))
+        return mymodule.prep(arch=arch)
     except fedpkg.FedpkgError, e:
         log.error('Could not prep: %s' % e)
         sys.exit(1)
