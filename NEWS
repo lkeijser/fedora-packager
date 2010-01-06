@@ -1,3 +1,7 @@
+Jan 05 2010
+Moved repo to git
+work started by Jesse on fedpkg as a replacement for the old Makefiles
+
 Aug 04 2009
 add fedora-hosted, a cli interface to our Trac setup
 
