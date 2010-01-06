@@ -125,12 +125,14 @@ def clean(dry=False, useignore=True):
     # Run it!
     log.debug('Running: %s' % subprocess.list2cmdline(cmd))
     try:
-        proc = subprocess.Popen(cmd, stderr=subprocess.STDOUT,
+        proc = subprocess.Popen(cmd, stderr=subprocess.PIPE,
                                 stdout=subprocess.PIPE)
-        output = proc.communicate()
+        output, error = proc.communicate()
     except OSError, e:
         raise FedpkgError(e)
-    log.info(output[0])
+    log.info(output)
+    if error:
+        log.error(error)
     return proc.returncode
 
 def clone(module, user, branch=None):
@@ -246,12 +248,14 @@ class PackageModule:
         # Run the command and capture output
         log.debug('Running: %s' % ' '.join(cmd))
         try:
-            proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.STDOUT,
+            proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.PIPE,
                                     stdout=subprocess.PIPE, shell=True)
-            output = proc.communicate()
+            output, error = proc.communicate()
         except OSError, e:
             raise FedpkgError(e)
-        log.info(output[0])
+        log.info(output)
+        if error:
+            log.error(error)
         return proc.returncode
 
     def getver(self):
@@ -316,12 +320,14 @@ class PackageModule:
         # Run the command and capture output
         log.debug('Running: %s' % ' '.join(cmd))
         try:
-            proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.STDOUT,
+            proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.PIPE,
                                     stdout=subprocess.PIPE, shell=True)
-            output = proc.communicate()
+            output, error = proc.communicate()
         except OSError, e:
             raise FedpkgError(e)
-        log.info(output[0])
+        log.info(output)
+        if error:
+            log.error(error)
         return proc.returncode
 
     def lint(self):
@@ -348,11 +354,14 @@ class PackageModule:
         # Run the command
         log.debug('Running: %s' % subprocess.list2cmdline(cmd))
         try:
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-            output = proc.communicate()
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE)
+            output, error = proc.communicate()
         except OSError, e:
             raise FedpkgError(e)
-        log.info(output[0])
+        log.info(output)
+        if error:
+            log.error(error)
         return proc.returncode
 
     def local(self, arch=None, hashtype='sha256'):
@@ -384,16 +393,19 @@ class PackageModule:
         # Run the command
         log.debug('Running: %s' % ' '.join(cmd))
         try:
-            proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.STDOUT,
+            proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.PIPE,
                                     stdout=subprocess.PIPE, shell=True)
-            output = proc.communicate()
+            output, error = proc.communicate()
         except OSError, e:
             raise FedpkgError(e)
         outfile = open(os.path.join(self.path, '.build-%s-%s.log' % (self.ver,
                        self.rel)), 'w')
-        outfile.writelines(output[0])
+        outfile.writelines(output)
+        log.info(output)
+        if error:
+            outfile.writelines(error)
+            log.error(error)
         outfile.close()
-        log.info(output[0])
         return proc.returncode
 
     def new_sources(self, files):
@@ -425,12 +437,14 @@ class PackageModule:
         # Run the command and capture output
         log.debug('Running: %s' % ' '.join(cmd))
         try:
-            proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.STDOUT,
+            proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.PIPE,
                                     stdout=subprocess.PIPE, shell=True)
-            output = proc.communicate()
+            output, error = proc.communicate()
         except OSError, e:
             raise FedpkgError(e)
-        log.info(output[0])
+        log.info(output)
+        if error:
+            log.error(error)
         return(proc.returncode)
                
     def sources(self, outdir=None):
