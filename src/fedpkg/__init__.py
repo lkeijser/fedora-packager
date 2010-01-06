@@ -445,7 +445,7 @@ class PackageModule:
         log.info(output)
         if error:
             log.error(error)
-        return(proc.returncode)
+        return proc.returncode
                
     def sources(self, outdir=None):
         """Download source files"""
