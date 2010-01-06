@@ -16,6 +16,7 @@ import hashlib
 import koji
 import rpm
 import logging
+import git
 
 # Define some global variables, put them here to make it easy to change
 LOOKASIDE = 'http://cvs.fedoraproject.org/repo/pkgs'
@@ -169,6 +170,20 @@ def clone_with_dirs(module, user):
     print('would have cloned %s with dirs as user %s' % 
           (module, user))
     return
+
+def new(path=os.getcwd()):
+    """Return changes in a repo since the last tag"""
+
+    # setup the repo object based on our path
+    try:
+        repo = git.Repo(path)
+    except git.errors.InvalidGitRepositoryError:
+        raise FedpkgError('%s is not a valid repo' % path)
+    # Find the latest tag
+    tag = repo.git.describe('--tags', '--abbrev=0')
+    # Now get the diff
+    log.debug('Diffing from tag %s' % tag)
+    return repo.git.diff('-M', tag)
 
 # Create a class for package module
 class PackageModule:
