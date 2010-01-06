@@ -23,15 +23,15 @@ def usage(args):
 # Define our stub functions
 def build(args):
     # not implimented
-    print('Not implimented yet, got %s' % args)
+    log.warning('Not implimented yet, got %s' % args)
 
 def chainbuild(args):
     # not implimented
-    print('Not implimented yet, got %s' % args)
+    log.warning('Not implimented yet, got %s' % args)
 
 def check(args):
     # not implimented
-    print('Not implimented yet, got %s' % args)
+    log.warning('Not implimented yet, got %s' % args)
 
 def clean(args):
     dry = False
@@ -41,13 +41,13 @@ def clean(args):
     if args.x:
         useignore = False
     try:
-        print(fedpkg.clean(dry, useignore))
+        log.info(fedpkg.clean(dry, useignore))
     except fedpkg.FedpkgError, e:
-        print('Could not clean: %s' % e)
+        log.error('Could not clean: %s' % e)
 
 def clog(args):
     # not implimented
-    print('Not implimented yet, got %s' % args)
+    log.warning('Not implimented yet, got %s' % args)
 
 def clone(args):
     if not args.user:
@@ -67,21 +67,21 @@ def compile(args):
         short = True
     try:
         mymodule = fedpkg.PackageModule(args.path)
-        print(mymodule.compile(arch=arch, short=short))
+        log.info(mymodule.compile(arch=arch, short=short))
     except fedpkg.FedpkgError, e:
-        print('Could not compile: %s' % e)
+        log.error('Could not compile: %s' % e)
         sys.exit(1)
 
 def export(args):
     # not implimented
-    print('Not implimented yet, got %s' % args)
+    log.warning('Not implimented yet, got %s' % args)
 
 def gimmespec(args):
     try:
         mymodule = fedpkg.PackageModule(args.path)
         print(mymodule.spec)
     except fedpkg.FedpkgError, e:
-        print('Could not get spec file: %s' % e)
+        log.error('Could not get spec file: %s' % e)
         sys.exit(1)
 
 def install(args):
@@ -93,17 +93,17 @@ def install(args):
         short = True
     try:
         mymodule = fedpkg.PackageModule(args.path)
-        print(mymodule.install(arch=arch, short=short))
+        log.info(mymodule.install(arch=arch, short=short))
     except fedpkg.FedpkgError, e:
-        print('Could not install: %s' % e)
+        log.error('Could not install: %s' % e)
         sys.exit(1)
 
 def lint(args):
     try:
         mymodule = fedpkg.PackageModule(args.path)
-        print(mymodule.lint())
+        log.info(mymodule.lint())
     except fedpkg.FedpkgError, e:
-        print('Could not run rpmlint: %s' % e)
+        log.error('Could not run rpmlint: %s' % e)
         sys.exit(1)
 
 def local(args):
@@ -113,32 +113,32 @@ def local(args):
     try:
         mymodule = fedpkg.PackageModule(args.path)
         if args.md5:
-            print(mymodule.local(arch=arch, hashtype='md5'))
+            log.info(mymodule.local(arch=arch, hashtype='md5'))
         else:
-            print(mymodule.local(arch=arch))
+            log.info(mymodule.local(arch=arch))
     except fedpkg.FedpkgError, e:
-        print('Could not build locally: %s' % e)
+        log.error('Could not build locally: %s' % e)
         sys.exit(1)
 
 def mockbuild(args):
     # not implimented
-    print('Not implimented yet, got %s' % args)
+    log.warning('Not implimented yet, got %s' % args)
 
 def new(args):
     # not implimented
-    print('Not implimented yet, got %s' % args)
+    log.warning('Not implimented yet, got %s' % args)
 
 def new_sources(args):
     try:
         mymodule = fedpkg.PackageModule(args.path)
         mymodule.new_sources(args.files)
     except fedpkg.FedpkgError, e:
-        print('Could not upload new sources: %s' % e)
+        log.error('Could not upload new sources: %s' % e)
         sys.exit(1)
 
 def patch(args):
     # not implimented
-    print('Not implimented yet, got %s' % args)
+    log.warning('Not implimented yet, got %s' % args)
 
 def prep(args):
     arch = None
@@ -146,21 +146,21 @@ def prep(args):
         arch = args.arch
     try:
         mymodule = fedpkg.PackageModule(args.path)
-        print(mymodule.prep(arch=arch))
+        log.info(mymodule.prep(arch=arch))
     except fedpkg.FedpkgError, e:
-        print('Could not prep: %s' % e)
+        log.error('Could not prep: %s' % e)
         sys.exit(1)
 
 def scratchbuild(args):
     # not implimented
-    print('Not implimented yet, got %s' % args)
+    log.warning('Not implimented yet, got %s' % args)
 
 def sources(args):
     try:
         mymodule = fedpkg.PackageModule(args.path)
         mymodule.sources(args.outdir)
     except fedpkg.FedpkgError, e:
-        print('Could not download sources: %s' % e)
+        log.error('Could not download sources: %s' % e)
         sys.exit(1)
 
 def srpm(args):
@@ -172,30 +172,30 @@ def srpm(args):
         else:
             mymodule.srpm()
     except fedpkg.FedpkgError, e:
-        print('Could not make an srpm: %s' % e)
+        log.error('Could not make an srpm: %s' % e)
         sys.exit(1)
 
 def tagrequest(args):
     # not implimented
-    print('Not implimented yet, got %s' % args)
+    log.warning('Not implimented yet, got %s' % args)
 
 def unusedfedpatches(args):
     # not implimented
-    print('Not implimented yet, got %s' % args)
+    log.warning('Not implimented yet, got %s' % args)
 
 def unusedpatches(args):
     # not implimented
-    print('Not implimented yet, got %s' % args)
+    log.warning('Not implimented yet, got %s' % args)
 
 def update(args):
     # not implimented
-    print('Not implimented yet, got %s' % args)
+    log.warning('Not implimented yet, got %s' % args)
 
 def verrel(args):
     try:
         mymodule = fedpkg.PackageModule(args.path)
     except fedpkg.FedpkgError, e:
-        print('Could not get ver-rel: %s' % e)
+        log.error('Could not get ver-rel: %s' % e)
         sys.exit(1)
     print('%s-%s-%s' % (mymodule.module, mymodule.ver, mymodule.rel))
 
