@@ -126,8 +126,11 @@ def mockbuild(args):
     log.warning('Not implimented yet, got %s' % args)
 
 def new(args):
-    # not implimented
-    log.warning('Not implimented yet, got %s' % args)
+    try:
+        print(fedpkg.new(args.path))
+    except fedpkg.FedpkgError, e:
+        log.error('Could not get new changes: %s' % e)
+        sys.exit(1)
 
 def new_sources(args):
     try:
