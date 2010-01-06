@@ -47,8 +47,12 @@ def clean(args):
         sys.exit(1)
 
 def clog(args):
-    # not implimented
-    log.warning('Not implimented yet, got %s' % args)
+    try:
+        mymodule = fedpkg.PackageModule(args.path)
+        return mymodule.clog()
+    except fedpkg.FedpkgError, e:
+        log.error('Could not generate clog: %s' % e)
+        sys.exit(1)
 
 def clone(args):
     if not args.user:
