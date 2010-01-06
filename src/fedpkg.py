@@ -14,6 +14,7 @@ import argparse
 import fedpkg
 import os
 import sys
+import logging
 
 # Add a simple function to print usage, for the 'help' command
 def usage(args):
@@ -210,8 +211,10 @@ if __name__ == '__main__':
     parser.add_argument('--path', default = os.getcwd(),
                     help='Directory to interact with instead of current dir')
     # Verbosity
-    parser.add_argument('-v', action = 'count',
-                        help = 'Verbosity, may be specified multiple times')
+    parser.add_argument('-v', action = 'store_true',
+                        help = 'Run with verbose debug output')
+    parser.add_argument('-q', action = 'store_true',
+                        help = 'Run quietly only displaying errors')
 
     # Add a subparsers object to use for the actions
     subparsers = parser.add_subparsers(title = 'Targets')
@@ -386,6 +389,21 @@ if __name__ == '__main__':
                                           ' name-version-release')
     parser_verrel.set_defaults(command = verrel)
 
-    # Parse the args and run the necessary command
+    # Parse the args
     args = parser.parse_args()
+
+    # setup the logger
+    log = fedpkg.log
+    if args.v:
+        log.setLevel(logging.DEBUG)
+    elif args.q:
+        log.setLevel(logging.WARNING)
+    else:
+        log.setLevel(logging.INFO)
+    streamhandler = logging.StreamHandler()
+    formatter = logging.Formatter('%(message)s')
+    streamhandler.setFormatter(formatter)
+    log.addHandler(streamhandler)
+
+    # Run the necessary command
     args.command(args)
