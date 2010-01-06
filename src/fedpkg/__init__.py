@@ -112,7 +112,7 @@ def clean(dry=False, useignore=True):
 
     Can optionally not use the ignore rules
 
-    Returns output
+    Logs output and returns the returncode
 
     """
 
@@ -123,18 +123,15 @@ def clean(dry=False, useignore=True):
     if not useignore:
         cmd.append('-x')
     # Run it!
+    log.debug('Running: %s' % subprocess.list2cmdline(cmd))
     try:
         proc = subprocess.Popen(cmd, stderr=subprocess.STDOUT,
                                 stdout=subprocess.PIPE)
         output = proc.communicate()
     except OSError, e:
         raise FedpkgError(e)
-    # See if we exited cleanly
-    if proc.returncode:
-        raise FedpkgError('%s returned %s: %s' %
-                          (subprocess.list2cmdline(cmd),
-                           proc.returncode, output[0]))
-    return output[0]
+    log.info(output[0])
+    return proc.returncode
 
 def clone(module, user, branch=None):
     """Clone a repo, optionally check out a specific branch.
@@ -232,7 +229,9 @@ class PackageModule:
 
         optionally for a specific arch, or short-circuit it
 
-        Returns the output"""
+        Logs the output and returns the returncode
+
+        """
 
         # Get the sources
         self.sources()
@@ -245,18 +244,15 @@ class PackageModule:
             cmd.append('--short-circuit')
         cmd.extend(['-bc', os.path.join(self.path, self.spec)])
         # Run the command and capture output
+        log.debug('Running: %s' % ' '.join(cmd))
         try:
             proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.STDOUT,
                                     stdout=subprocess.PIPE, shell=True)
             output = proc.communicate()
         except OSError, e:
             raise FedpkgError(e)
-        # See if we exited cleanly
-        if proc.returncode:
-            raise FedpkgError('%s returned %s: %s' %
-                              (subprocess.list2cmdline(cmd),
-                               proc.returncode, output[0]))
-        return output[0]
+        log.info(output[0])
+        return proc.returncode
 
     def getver(self):
         """Return the version-release of a package module."""
@@ -287,11 +283,12 @@ class PackageModule:
         return output[0]
 
     def gimmespec(self):
-        """Print the name of a specfile within a package module"""
+        """Return the name of a specfile within a package module"""
     
         # Get a list of files in the path we're looking at
         files = os.listdir(self.path)
         # Search the files for the first one that ends with ".spec"
+        log.debug('Looking through files: %s' % ' '.join(files))
         for f in files:
             if f.endswith('.spec'):
                 return f
@@ -302,7 +299,9 @@ class PackageModule:
 
         optionally for a specific arch, or short-circuit it
 
-        Returns the output"""
+        Logs the output and returns the returncode
+
+        """
 
         # Get the sources
         self.sources()
@@ -315,21 +314,22 @@ class PackageModule:
             cmd.append('--short-circuit')
         cmd.extend(['-bi', os.path.join(self.path, self.spec)])
         # Run the command and capture output
+        log.debug('Running: %s' % ' '.join(cmd))
         try:
             proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.STDOUT,
                                     stdout=subprocess.PIPE, shell=True)
             output = proc.communicate()
         except OSError, e:
             raise FedpkgError(e)
-        # See if we exited cleanly
-        if proc.returncode:
-            raise FedpkgError('%s returned %s: %s' %
-                              (subprocess.list2cmdline(cmd),
-                               proc.returncode, output[0]))
-        return output[0]
+        log.info(output[0])
+        return proc.returncode
 
     def lint(self):
-        """Run rpmlint over a built srpm"""
+        """Run rpmlint over a built srpm
+
+        Log the output and return the returncode
+
+        """
 
         # Make sure we have rpms to run on
         srpm = "%s-%s-%s.src.rpm" % (self.module, self.ver, self.rel)
@@ -345,18 +345,24 @@ class PackageModule:
                          if file.endswith('.rpm')])
         cmd = ['rpmlint', os.path.join(self.path, srpm)]
         cmd.extend(rpms)
+        # Run the command
+        log.debug('Running: %s' % subprocess.list2cmdline(cmd))
         try:
-            output = subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()
-        except subprocess.CalledProcessError, e:
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+            output = proc.communicate()
+        except OSError, e:
             raise FedpkgError(e)
-        return output[0]
+        log.info(output[0])
+        return proc.returncode
 
     def local(self, arch=None, hashtype='sha256'):
         """rpmbuild locally for given arch.
 
         Takes arch to build for, and hashtype to build with.
 
-        Writes output to a log file and returns output from build.
+        Writes output to a log file and logs it to the logger
+
+        Returns the returncode from the build call
 
         """
 
@@ -375,6 +381,8 @@ class PackageModule:
                         "--define '_binary_filedigest_algorithm %s'" % hashtype])
         cmd.extend(['--target', arch, '-ba',
                     os.path.join(self.path, self.spec)])
+        # Run the command
+        log.debug('Running: %s' % ' '.join(cmd))
         try:
             proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.STDOUT,
                                     stdout=subprocess.PIPE, shell=True)
@@ -385,12 +393,8 @@ class PackageModule:
                        self.rel)), 'w')
         outfile.writelines(output[0])
         outfile.close()
-        # See if we had a good return or not, raise accordingly
-        if proc.returncode:
-            raise FedpkgError('%s returned %s: %s' %
-                              (subprocess.list2cmdline(cmd),
-                               proc.returncode, output[0]))
-        return output[0]
+        log.info(output[0])
+        return proc.returncode
 
     def new_sources(self, files):
         """Replace source file(s) in the lookaside cache"""
@@ -406,7 +410,9 @@ class PackageModule:
 
         optionally for a specific arch
 
-        Logs the output and returns the returncode from the prep call"""
+        Logs the output and returns the returncode from the prep call
+
+        """
 
         # Get the sources
         self.sources()
