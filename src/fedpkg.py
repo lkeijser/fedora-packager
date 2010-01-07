@@ -126,8 +126,19 @@ def local(args):
         sys.exit(1)
 
 def mockbuild(args):
-    # not implimented
-    log.warning('Not implimented yet, got %s' % args)
+    # Pick up any mockargs from the env
+    mockargs = []
+    try:
+        mockargs = os.environ['MOCKARGS'].split()
+    except KeyError:
+        # there were no args
+        pass
+    try:
+        mymodule = fedpkg.PackageModule(args.path)
+        return mymodule.mockbuild(mockargs)
+    except fedpkg.FedpkgError, e:
+        log.error('Could not run mockbuild: %s' % e)
+        sys.exit(1)
 
 def new(args):
     try:
