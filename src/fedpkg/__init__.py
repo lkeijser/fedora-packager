@@ -218,6 +218,7 @@ class PackageModule:
     def __init__(self, path=os.getcwd()):
         # Initiate a PackageModule object in a given path
         # Set some global variables used throughout
+        log.debug('Creating module object from %s' % path)
         self.path = path
         self.lookaside = LOOKASIDE
         self.lookasidehash = LOOKASIDEHASH
@@ -356,7 +357,6 @@ class PackageModule:
         # Get a list of files in the path we're looking at
         files = os.listdir(self.path)
         # Search the files for the first one that ends with ".spec"
-        log.debug('Looking through files: %s' % ' '.join(files))
         for f in files:
             if f.endswith('.spec'):
                 return f
