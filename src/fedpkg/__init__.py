@@ -223,6 +223,9 @@ class PackageModule:
         self.lookasidehash = LOOKASIDEHASH
         self.spec = self.gimmespec()
         self.module = self.spec.split('.spec')[0]
+        self.localarch = self._getlocalarch()
+        # Set the default mock config to None, not all branches have a config
+        self.mockconfig = None
         # Find the branch and set things based from that
         # Still requires a 'branch' file in each branch
         self.branch = self._findbranch()
@@ -230,10 +233,12 @@ class PackageModule:
             self.distval = self.branch.split('-')[1]
             self.distvar = 'fedora'
             self.dist = '.fc%s' % self.distval
+            self.mockconfig = 'fedora-%s-%s' % (self.distval, self.localarch)
         elif self.branch.startswith('EL-'):
             self.distval = self.branch.split('-')[1]
             self.distvar = 'epel'
             self.dist = '.el%s' % self.distval
+            self.mockconfig = 'epel-%s-%s' % (self.distval, self.localarch)
         elif self.branch.startswith('OLPC-'):
             self.distval = self.branch.split('-')[1]
             self.distvar = 'olpc'
@@ -243,6 +248,7 @@ class PackageModule:
             self.distval = '13' # this is hardset for now, which is bad
             self.distvar = 'fedora'
             self.dist = '.fc%s' % self.distval
+            self.mockconfig = 'fedora-devel-%s' % self.localarch
         self.rpmdefines = ["--define '_sourcedir %s'" % path,
                            "--define '_specdir %s'" % path,
                            "--define '_builddir %s'" % path,
@@ -253,7 +259,6 @@ class PackageModule:
                            "--define '%s 1'" % self.distvar]
         self.ver = self.getver()
         self.rel = self.getrel()
-        self.localarch = self._getlocalarch()
 
     def clog(self):
         """Write the latest spec changelog entry to a clog file"""
@@ -465,6 +470,39 @@ class PackageModule:
             outfile.writelines(error)
             log.error(error)
         outfile.close()
+        return proc.returncode
+
+    def mockbuild(self, mockargs=[]):
+        """Build the package in mock, using mockargs
+
+        Log the output and return the returncode
+
+        """
+
+        # Make sure we have an srpm to run on
+        srpm = os.path.join(self.path,
+                            "%s-%s-%s.src.rpm" % (self.module,
+                                                  self.ver, self.rel))
+        if not os.path.exists(srpm):
+            raise FedpkgError('Need to build srpm first')
+
+        # setup the command
+        cmd = ['mock']
+        cmd.extend(mockargs)
+        cmd.extend(['-r', self.mockconfig, '--resultdir',
+                    os.path.join(self.path, self.module, self.ver, self.rel),
+                    '--rebuild', srpm])
+        # Run the command
+        log.debug('Running: %s' % subprocess.list2cmdline(cmd))
+        try:
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE)
+            output, error = proc.communicate()
+        except OSError, e:
+            raise FedpkgError(e)
+        log.info(output)
+        if error:
+            log.error(error)
         return proc.returncode
 
     def new_sources(self, files):
