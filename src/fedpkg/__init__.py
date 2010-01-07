@@ -136,26 +136,40 @@ def clean(dry=False, useignore=True):
         log.error(error)
     return proc.returncode
 
-def clone(module, user, branch=None):
+def clone(module, user, path=os.getcwd(), branch=None):
     """Clone a repo, optionally check out a specific branch.
 
     module is the name of the module to clone
 
+    path is the basedir to perform the clone in
+
     branch is the name of a branch to checkout instead of origin/master
 
-    gitargs is an optional list of arguments to git clone
+    Logs the output and returns the return code
 
     """
 
-    # not implemented yet
     # construct the git url
     giturl = GITBASEURL % {'user': user, 'module': module}
-    cmd = ['git', 'clone']
-    if branch:
-        cmd.extend(['--branch', branch])
-    cmd.append(giturl)
-    print('Would have ran %s' % subprocess.list2cmdline(cmd))
-    return
+    # Create the git object
+    mygit = git.Git(path)
+    # do the clone and capture the output
+    try:
+        if branch:
+            log.debug('Cloning %s with branch %s' % (giturl, branch))
+            retcode, output, error = mygit.clone('--branch', branch,
+                                                 giturl,
+                                                 with_extended_output=True)
+        else:
+            log.debug('Cloning %s' % giturl)
+            retcode, output, error = mygit.clone(giturl,
+                                                 with_extended_output=True)
+    except (git.GitCommandError, OSError), e:
+        raise FedpkgError('Could not clone %s: %s' % (giturl, e))
+    log.info(output)
+    if error:
+        log.error(error)
+    return retcode
 
 def clone_with_dirs(module, user):
     """Clone a repo old style with subdirs for each branch.
