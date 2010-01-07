@@ -59,9 +59,9 @@ def clone(args):
         # Use a method to scrape user from fedora cert here
         args.user = os.getlogin()
     if args.branches:
-        fedpkg.clone_with_dirs(args.module, args.user)
+        fedpkg.clone_with_dirs(args.module[0], args.user)
     else:
-        fedpkg.clone(args.module, args.user, args.branch)
+        fedpkg.clone(args.module[0], args.user, args.path, args.branch)
 
 def compile(args):
     arch = None
@@ -272,7 +272,7 @@ if __name__ == '__main__':
     parser_clone.add_argument('--branch', '-b',
                               help = 'Check out a specific branch')
     # store the module to be cloned
-    parser_clone.add_argument('--module', '-m', required = True,
+    parser_clone.add_argument('module', nargs = 1,
                               help = 'Name of the module to clone')
     parser_clone.set_defaults(command = clone)
 
