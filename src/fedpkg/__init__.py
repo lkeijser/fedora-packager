@@ -22,6 +22,7 @@ import git
 LOOKASIDE = 'http://cvs.fedoraproject.org/repo/pkgs'
 LOOKASIDEHASH = 'md5'
 GITBASEURL = 'ssh://%(user)s@pkgs.stg.fedoraproject.org/%(module)s'
+ANONGITURL = 'git://pkgs.stg.fedoraproject.org/%(module)s'
 
 # Define our own error class
 class FedpkgError(Exception):
