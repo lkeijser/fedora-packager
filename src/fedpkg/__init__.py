@@ -235,21 +235,25 @@ class PackageModule:
             self.distval = self.branch.split('-')[1]
             self.distvar = 'fedora'
             self.dist = '.fc%s' % self.distval
+            self.target = 'dist-f%s-updates-candidate' % self.distval
             self.mockconfig = 'fedora-%s-%s' % (self.distval, self.localarch)
         elif self.branch.startswith('EL-'):
             self.distval = self.branch.split('-')[1]
             self.distvar = 'epel'
             self.dist = '.el%s' % self.distval
+            self.target = 'dist-%sE-epel-testing-candidate' % self.distval
             self.mockconfig = 'epel-%s-%s' % (self.distval, self.localarch)
         elif self.branch.startswith('OLPC-'):
             self.distval = self.branch.split('-')[1]
             self.distvar = 'olpc'
             self.dist = '.olpc%s' % self.distval
+            self.target = 'dist-olpc%s' % self.distval
         # Need to do something about no branch here
         elif self.branch == 'devel':
             self.distval = '13' # this is hardset for now, which is bad
             self.distvar = 'fedora'
             self.dist = '.fc%s' % self.distval
+            self.target = 'dist-f%s' % self.distval # will be dist-rawhide
             self.mockconfig = 'fedora-devel-%s' % self.localarch
         self.rpmdefines = ["--define '_sourcedir %s'" % path,
                            "--define '_specdir %s'" % path,
