@@ -16,14 +16,53 @@ import os
 import sys
 import logging
 
+# Define packages which belong to specific secondary arches
+# This is ugly and should go away.  A better way to do this is to have a list
+# of secondary arches, and then check the spec file for ExclusiveArch that
+# is one of the secondary arches, and handle it accordingly.
+SECONDARY_ARCH_PKGS = {'sparc': ['silo', 'prtconf', 'lssbus', 'afbinit',
+                                 'piggyback', 'xorg-x11-drv-sunbw2',
+                                 'xorg-x11-drv-suncg14', 'xorg-x11-drv-suncg3',
+                                 'xorg-x11-drv-suncg6', 'xorg-x11-drv-sunffb',
+                                 'xorg-x11-drv-sunleo', 'xorg-x11-drv-suntcx'],
+                       'ppc': ['ppc64-utils', 'yaboot'],
+                       'arm': []}
+
 # Add a simple function to print usage, for the 'help' command
 def usage(args):
     parser.print_help()
 
 # Define our stub functions
+def _is_secondary(module):
+    """Check a list to see if the package is a secondary arch package"""
+
+    for arch in SECONDARY_ARCH_PKGS.keys():
+        if module in SECONDARY_ARCH_PKGS[arch]:
+            return arch
+    return None
+
+def _get_secondary_config(mymodule):
+    """Return the right config for a given secondary arch"""
+
+    arch = _is_secondary(mymodule.module)
+    if arch:
+        if arch == 'ppc' and mymodule.distvar == 'feodra' and \
+           mymodule.distval < '13':
+            return None
+        return os.path.expanduser('~/.koji/%s-config' % arch)
+    else:
+        return None
+
 def build(args):
-    # not implimented
-    log.warning('Not implimented yet, got %s' % args)
+    # Need to do something with BUILD_FLAGS or KOJI_FLAGS here for compat
+    try:
+        mymodule = fedpkg.PackageModule(args.path)
+        kojiconfig = _get_secondary_config(mymodule)
+        return mymodule.build(args.skip_tag, args.scratch, args.nowait,
+                              args.q, args.background, kojiconfig)
+    except fedpkg.FedpkgError, e:
+        log.error('Could not build: %s' % e)
+        sys.exit(1)
 
 def chainbuild(args):
     # not implimented
@@ -246,6 +285,18 @@ if __name__ == '__main__':
     # build target
     parser_build = subparsers.add_parser('build',
                                          help = 'Request build')
+    parser_build.add_argument('--skip-tag', action = 'store_true',
+                              default = False,
+                              help = 'Do not attempt to tag package')
+    parser_build.add_argument('--scratch', action = 'store_true',
+                              default = False,
+                              help = 'Perform a scratch build')
+    parser_build.add_argument('--nowait', action = 'store_true',
+                              default = False,
+                              help = "Don't wait on build")
+    parser_build.add_argument('--background', action = 'store_true',
+                              default = False,
+                              help = 'Run the build at a lower priority')
     parser_build.set_defaults(command = build)
 
     # chain build
