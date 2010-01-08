@@ -265,6 +265,62 @@ class PackageModule:
                            "--define '%s 1'" % self.distvar]
         self.ver = self.getver()
         self.rel = self.getrel()
+        try:
+            self.repo = git.Repo(path)
+        except git.errors.InvalidGitRepositoryError:
+            raise FedpkgError('%s is not a valid repo' % path)
+
+    def build(self, skip_tag=False, scratch=False, nowait=False, quiet=False,
+              background=False, kojiconfig=None):
+        """Initiate a build of the module.  Available options are:
+
+        skip-tag: Skip the tag action after the build
+
+        scratch: Perform a scratch build
+
+        wait: Wait for the build to finish before returning the shell
+
+        quiet: Stifle output of the build
+
+        background: Perform the build with a low priority
+
+        kojiconfig: Use an alternate koji config file
+
+        Logs the output and returns the return code
+
+        """
+
+        # Check to see if the tree is dirty
+        if self.repo.is_dirty:
+            raise FedpkgError('There are uncommitted changes in your repo')
+        # Need to check here to see if the local commit you want to build is
+        # pushed or not
+        # This doesn't work if the local branch name doesn't match the remote
+        if self.repo.git.rev_list('...origin/%s' % self.repo.active_branch):
+            raise FedpkgError('There are unpushed changes in your repo')
+        # Get the commit hash to build
+        commit = self.repo.commits(max_count=1)[0].id
+        # construct the url
+        url = ANONGITURL % {'module': self.module} + '#%s' % commit
+        # Using the cli for now, I don't want to deal with setting up all
+        # the certs and stuff.
+        cmd = ['koji', 'build']
+        if skip_tag:
+            cmd.append('--skip-tag')
+        if scratch:
+            cmd.append('--scratch')
+        if nowait:
+            cmd.append('--nowait')
+        if quiet:
+            cmd.append('--quiet')
+        if background:
+            cmd.append('--background')
+        if kojiconfig:
+            cmd.extend(['-c', kojiconfig])
+        cmd.extend([self.target, url])
+        # Run the command
+        log.debug('Running: %s' % subprocess.list2cmdline(cmd))
+        return
 
     def clog(self):
         """Write the latest spec changelog entry to a clog file"""
