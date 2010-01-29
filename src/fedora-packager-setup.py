@@ -1,7 +1,6 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
+#  Copyright (C) 2007, 2008, 2009, 2010 Dennis Gilmore
 #  Copyright (C) 2009 Stewart Adam
-#  Copyright (C) 2007, 2008, 2009 Dennis Gilmore
 #  This file is part of fedora-packager.
 
 #  fedora-packager is free software: you can redistribute it and/or modify
@@ -21,6 +20,7 @@ import os
 import string
 import sys
 import subprocess
+import fedora_cert
 import pycurl
 
 
@@ -107,9 +107,15 @@ def main():
     upload_ca_cert = os.path.join(user_home, '.fedora-upload-ca.cert')
     server_ca_cert = os.path.join(user_home, '.fedora-server-ca.cert')
     if not os.path.isfile(user_cert):
-        print '''You need a client certificate from the Fedora Account System
-Please download one by running "fedora-cert -n" and re-running this script'''
-        sys.exit(1)
+        print '''You need a client certificate from the Fedora Account System, lets get one now'''
+        create_user_cert()
+    else:
+        #check if the cert has expired  if it has lets get a new one
+        if certificate_expired():
+            username = read_user_cert()
+            print "Certificate has expired, getting a new one"
+            create_user_cert(username)
+
     download_cert('https://admin.fedoraproject.org/accounts/fedora-server-ca.cert', server_ca_cert)
     if not os.path.islink(upload_ca_cert):
         print 'Linking: ~/.fedora-server-ca.cert to ~/.fedora-upload-ca.cert'
