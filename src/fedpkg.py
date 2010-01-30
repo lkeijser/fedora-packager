@@ -12,6 +12,7 @@
 
 import argparse
 import fedpkg
+import fedora_cert
 import os
 import sys
 import logging
@@ -95,8 +96,13 @@ def clog(args):
 
 def clone(args):
     if not args.user:
-        # Use a method to scrape user from fedora cert here
-        args.user = os.getlogin()
+        # Doing a try doesn't really work since the fedora_cert library just
+        # exits on error, but if that gets fixed this will work better.
+        try:
+            args.user = fedora_cert.read_user_cert()
+        except:
+            log.debug('Could not read Fedora cert, using login name')
+            args.user = os.getlogin()
     if args.branches:
         fedpkg.clone_with_dirs(args.module[0], args.user)
     else:
