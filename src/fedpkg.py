@@ -148,6 +148,88 @@ def _get_secondary_config(mymodule):
     else:
         return None
 
+def _display_tasklist_status(tasks):
+    free = 0
+    open = 0
+    failed = 0
+    done = 0
+    for task_id in tasks.keys():
+        status = tasks[task_id].info['state']
+        if status == koji.TASK_STATES['FAILED']:
+            failed += 1
+        elif status == koji.TASK_STATES['CLOSED'] or status == koji.TASK_STATES['CANCELED']:
+            done += 1
+        elif status == koji.TASK_STATES['OPEN'] or status == koji.TASK_STATES['ASSIGNED']:
+            open += 1
+        elif status == koji.TASK_STATES['FREE']:
+            free += 1
+    log.info("  %d free  %d open  %d done  %d failed" % (free, open, done, failed))
+
+def _display_task_results(tasks):
+    for task in [task for task in tasks.values() if task.level == 0]:
+        state = task.info['state']
+        task_label = task.str()
+
+        if state == koji.TASK_STATES['CLOSED']:
+            log.info('%s completed successfully' % task_label)
+        elif state == koji.TASK_STATES['FAILED']:
+            log.info('%s failed' % task_label)
+        elif state == koji.TASK_STATES['CANCELED']:
+            log.info('%s was canceled' % task_label)
+        else:
+            # shouldn't happen
+            log.info('%s has not completed' % task_label)
+
+def _watch_koji_tasks(session, tasklist, quiet=False):
+    if not tasklist:
+        return
+    log.info('Watching tasks (this may be safely interrupted)...')
+    # Place holder for return value
+    rv = 0
+    try:
+        tasks = {}
+        for task_id in tasklist:
+            tasks[task_id] = TaskWatcher(task_id, session, quiet=quiet)
+        while True:
+            all_done = True
+            for task_id,task in tasks.items():
+                changed = task.update()
+                if not task.is_done():
+                    all_done = False
+                else:
+                    if changed:
+                        # task is done and state just changed
+                        if not quiet:
+                            _display_tasklist_status(tasks)
+                    if not task.is_success():
+                        rv = 1
+                for child in session.getTaskChildren(task_id):
+                    child_id = child['id']
+                    if not child_id in tasks.keys():
+                        tasks[child_id] = TaskWatcher(child_id, session, task.level + 1, quiet=quiet)
+                        tasks[child_id].update()
+                        # If we found new children, go through the list again,
+                        # in case they have children also
+                        all_done = False
+            if all_done:
+                if not quiet:
+                    print
+                    _display_task_results(tasks)
+                break
+
+            time.sleep(1)
+    except (KeyboardInterrupt):
+        if tasks:
+            log.info(
+"""\nTasks still running. You can continue to watch with the 'koji watch-task' command.
+Running Tasks:
+%s""" % '\n'.join(['%s: %s' % (t.str(), t.display_state(t.info))
+                   for t in tasks.values() if not t.is_done()]))
+        # /us/rbin/koji considers a ^c while tasks are running to be a
+        # non-zero exit.  I don't quite agree, so I comment it out here.
+        #rv = 1
+    return rv
+
 def build(args):
     # Need to do something with BUILD_FLAGS or KOJI_FLAGS here for compat
     try:
