@@ -439,8 +439,13 @@ def unusedfedpatches(args):
     log.warning('Not implimented yet, got %s' % args)
 
 def unusedpatches(args):
-    # not implimented
-    log.warning('Not implimented yet, got %s' % args)
+    try:
+        mymodule = fedpkg.PackageModule(args.path)
+        unused = mymodule.unused_patches()
+    except fedpkg.FedpkgError, e:
+        log.error('Could not get unused patches: %s' % e)
+        sys.exit(1)
+    print('\n'.join(unused))
 
 def update(args):
     # not implimented
