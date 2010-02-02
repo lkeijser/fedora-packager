@@ -16,6 +16,9 @@ import fedora_cert
 import os
 import sys
 import logging
+import koji
+import xmlrpclib
+import time
 
 # Define packages which belong to specific secondary arches
 # This is ugly and should go away.  A better way to do this is to have a list
@@ -28,6 +31,97 @@ SECONDARY_ARCH_PKGS = {'sparc': ['silo', 'prtconf', 'lssbus', 'afbinit',
                                  'xorg-x11-drv-sunleo', 'xorg-x11-drv-suntcx'],
                        'ppc': ['ppc64-utils', 'yaboot'],
                        'arm': []}
+
+# Add a class stolen from /usr/bin/koji to watch tasks
+# this was cut/pasted from koji, and then modified for local use.
+# The formatting is koji style, not the stile of this file.  Do not use these
+# functions as a style guide.
+# This is fragile and hopefully will be replaced by a real kojiclient lib.
+class TaskWatcher(object):
+
+    def __init__(self,task_id,session,level=0,quiet=False):
+        self.id = task_id
+        self.session = session
+        self.info = None
+        self.level = level
+        self.quiet = quiet
+
+    #XXX - a bunch of this stuff needs to adapt to different tasks
+
+    def str(self):
+        if self.info:
+            label = koji.taskLabel(self.info)
+            return "%s%d %s" % ('  ' * self.level, self.id, label)
+        else:
+            return "%s%d" % ('  ' * self.level, self.id)
+
+    def __str__(self):
+        return self.str()
+
+    def get_failure(self):
+        """Print infomation about task completion"""
+        if self.info['state'] != koji.TASK_STATES['FAILED']:
+            return ''
+        error = None
+        try:
+            result = self.session.getTaskResult(self.id)
+        except (xmlrpclib.Fault,koji.GenericError),e:
+            error = e
+        if error is None:
+            # print "%s: complete" % self.str()
+            # We already reported this task as complete in update()
+            return ''
+        else:
+            return '%s: %s' % (error.__class__.__name__, str(error).strip())
+
+    def update(self):
+        """Update info and log if needed.  Returns True on state change."""
+        if self.is_done():
+            # Already done, nothing else to report
+            return False
+        last = self.info
+        self.info = self.session.getTaskInfo(self.id, request=True)
+        if self.info is None:
+            log.error("No such task id: %i" % self.id)
+            sys.exit(1)
+        state = self.info['state']
+        if last:
+            #compare and note status changes
+            laststate = last['state']
+            if laststate != state:
+                log.info("%s: %s -> %s" % (self.str(),
+                                           self.display_state(last),
+                                           self.display_state(self.info)))
+                return True
+            return False
+        else:
+            # First time we're seeing this task, so just show the current state
+            log.info("%s: %s" % (self.str(), self.display_state(self.info)))
+            return False
+
+    def is_done(self):
+        if self.info is None:
+            return False
+        state = koji.TASK_STATES[self.info['state']]
+        return (state in ['CLOSED','CANCELED','FAILED'])
+
+    def is_success(self):
+        if self.info is None:
+            return False
+        state = koji.TASK_STATES[self.info['state']]
+        return (state == 'CLOSED')
+
+    def display_state(self, info):
+        if info['state'] == koji.TASK_STATES['OPEN']:
+            if info['host_id']:
+                host = self.session.getHost(info['host_id'])
+                return 'open (%s)' % host['name']
+            else:
+                return 'open'
+        elif info['state'] == koji.TASK_STATES['FAILED']:
+            return 'FAILED: %s' % self.get_failure()
+        else:
+            return koji.TASK_STATES[info['state']].lower()
 
 # Add a simple function to print usage, for the 'help' command
 def usage(args):
