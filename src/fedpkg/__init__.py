@@ -723,3 +723,24 @@ class PackageModule:
         except subprocess.CalledProcessError, e:
             raise FedpkgError('Could not build %s: %s' % (self.module, e))
         return
+
+    def unused_patches(self):
+        """Discover patches checked into source control that are not used
+
+        Returns a list of unused patches, which may be empty.
+
+        """
+
+        # Create a list for unused patches
+        unused = []
+        # Get the content of spec into memory for fast searching
+        spec = open(self.spec, 'r').read()
+        # Get a list of files tracked in source control
+        files = self.repo.git.ls_files('--exclude-standard').split()
+        for file in files:
+            # throw out non patches
+            if not file.endswith('.patch'):
+                continue
+            if file not in spec:
+                unused.append(file)
+        return unused
