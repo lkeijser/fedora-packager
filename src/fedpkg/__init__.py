@@ -17,6 +17,7 @@ import koji
 import rpm
 import logging
 import git
+import ConfigParser
 
 # Define some global variables, put them here to make it easy to change
 LOOKASIDE = 'http://cvs.fedoraproject.org/repo/pkgs'
@@ -270,23 +271,23 @@ class PackageModule:
         except git.errors.InvalidGitRepositoryError:
             raise FedpkgError('%s is not a valid repo' % path)
 
-    def build(self, skip_tag=False, scratch=False, nowait=False, quiet=False,
-              background=False, kojiconfig=None):
+    def build(self, user, skip_tag=False, scratch=False, background=False,
+              kojiconfig=None):
         """Initiate a build of the module.  Available options are:
 
-        skip-tag: Skip the tag action after the build
+        user: User to log into koji as
+
+        skip_tag: Skip the tag action after the build
 
         scratch: Perform a scratch build
-
-        wait: Wait for the build to finish before returning the shell
-
-        quiet: Stifle output of the build
 
         background: Perform the build with a low priority
 
         kojiconfig: Use an alternate koji config file
 
-        Logs the output and returns the return code
+        This function submits the task to koji and returns the taskID
+
+        It is up to the client to wait or watch the task.
 
         """
 
@@ -302,25 +303,75 @@ class PackageModule:
         commit = self.repo.commits(max_count=1)[0].id
         # construct the url
         url = ANONGITURL % {'module': self.module} + '#%s' % commit
-        # Using the cli for now, I don't want to deal with setting up all
-        # the certs and stuff.
-        cmd = ['koji', 'build']
-        if skip_tag:
-            cmd.append('--skip-tag')
-        if scratch:
-            cmd.append('--scratch')
-        if nowait:
-            cmd.append('--nowait')
-        if quiet:
-            cmd.append('--quiet')
-        if background:
-            cmd.append('--background')
+        # Stealing a bunch of code from /usr/bin/koji here, too bad it isn't
+        # in a more usable library form
+        defaults = {
+                    'server' : 'http://localhost/kojihub',
+                    'weburl' : 'http://localhost/koji',
+                    'pkgurl' : 'http://localhost/packages',
+                    'topdir' : '/mnt/koji',
+                    'cert': '~/.koji/client.crt',
+                    'ca': '~/.koji/clientca.crt',
+                    'serverca': '~/.koji/serverca.crt',
+                    'authtype': None
+                    }
+        # Process the configs in order, global, user, then any option passed
+        configs = ['/etc/koji.conf', os.path.expanduser('~/.koji/config')]
         if kojiconfig:
-            cmd.extend(['-c', kojiconfig])
-        cmd.extend([self.target, url])
-        # Run the command
-        log.debug('Running: %s' % subprocess.list2cmdline(cmd))
-        return
+            configs.append(os.path.join(kojiconfig))
+        for configFile in configs:
+            if os.access(configFile, os.F_OK):
+                f = open(configFile)
+                config = ConfigParser.ConfigParser()
+                config.readfp(f)
+                f.close()
+                if config.has_section('koji'):
+                    for name, value in config.items('koji'):
+                        if defaults.has_key(name):
+                            defaults[name] = value
+        # Expand out the directory options
+        for name in ('topdir', 'cert', 'ca', 'serverca'):
+            defaults[name] = os.path.expanduser(defaults[name])
+        session_opts = {'user': user}
+        # We assign the kojisession to our self as it can be used later to
+        # watch the tasks.
+        self.kojisession = koji.ClientSession(defaults['server'], session_opts)
+        # log in using ssl
+        self.kojisession.ssl_login(defaults['cert'], defaults['ca'],
+                                   defaults['serverca'])
+        if not self.kojisession.logged_in:
+            raise FedpkgError('Could not auth with koji as %s' % user)
+        # Check to see if the target is valid
+        build_target = self.kojisession.getBuildTarget(self.target)
+        if not build_target:
+            raise FedpkgError('Unknown build target: %s' % self.target)
+        # see if the dest tag is locked
+        dest_tag = self.kojisession.getTag(build_target['dest_tag_name'])
+        if not dest_tag:
+            raise FedpkgError('Unknown destination tag %s' %
+                              build_target['dest_tag_name'])
+        if dest_tag['locked'] and not scratch:
+            raise FedpkgError('Destination tag %s is locked' % dest_tag['name'])
+        # define our dictionary for options
+        opts = {}
+        # Set a placeholder for the build priority
+        priority = None
+        if skip_tag:
+            opts['skip_tag'] = True
+        if scratch:
+            opts['scratch'] = True
+        if background:
+            priority = 5 # magic koji number :/
+
+        log.debug('Building %s for %s with options %s and a priority of %s' %
+                  (url, self.target, opts, priority))
+        # Now submit the task and get the task_id to return
+        task_id = self.kojisession.build(url, self.target, opts,
+                                         priority=priority)
+        log.info('Created task: %s' % task_id)
+        log.info('Task info: %s/taskinfo?taskID=%s' % (defaults['weburl'],
+                                                       task_id))
+        return task_id
 
     def clog(self):
         """Write the latest spec changelog entry to a clog file"""
