@@ -231,15 +231,30 @@ Running Tasks:
     return rv
 
 def build(args):
+    if not args.user:
+        # Doing a try doesn't really work since the fedora_cert library just
+        # exits on error, but if that gets fixed this will work better.
+        try:
+            args.user = fedora_cert.read_user_cert()
+        except:
+            log.debug('Could not read Fedora cert, using login name')
+            args.user = os.getlogin()
     # Need to do something with BUILD_FLAGS or KOJI_FLAGS here for compat
     try:
         mymodule = fedpkg.PackageModule(args.path)
         kojiconfig = _get_secondary_config(mymodule)
-        return mymodule.build(args.skip_tag, args.scratch, args.nowait,
-                              args.q, args.background, kojiconfig)
+        task_id = mymodule.build(args.user, args.skip_tag, args.scratch,
+                                 args.background, kojiconfig)
     except fedpkg.FedpkgError, e:
         log.error('Could not build: %s' % e)
         sys.exit(1)
+    # Now that we have the task ID we need to deal with it.
+    if args.nowait:
+        # Log out of the koji session
+        mymodule.kojisession.logout()
+        return
+    # pass info off to our koji task watcher
+    return _watch_koji_tasks(mymodule.kojisession, [task_id], quiet=args.q)
 
 def chainbuild(args):
     # not implimented
