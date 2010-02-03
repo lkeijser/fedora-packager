@@ -19,6 +19,8 @@ import logging
 import koji
 import xmlrpclib
 import time
+import random
+import string
 
 # Define packages which belong to specific secondary arches
 # This is ugly and should go away.  A better way to do this is to have a list
@@ -230,7 +232,47 @@ Running Tasks:
         #rv = 1
     return rv
 
+# Stole these three functions from /usr/bin/koji
+def _format_size(size):
+    if (size / 1073741824 >= 1):
+        return "%0.2f GiB" % (size / 1073741824.0)
+    if (size / 1048576 >= 1):
+        return "%0.2f MiB" % (size / 1048576.0)
+    if (size / 1024 >=1):
+        return "%0.2f KiB" % (size / 1024.0)
+    return "%0.2f B" % (size)
+
+def _format_secs(t):
+    h = t / 3600
+    t = t % 3600
+    m = t / 60
+    s = t % 60
+    return "%02d:%02d:%02d" % (h, m, s)
+
+def _progress_callback(uploaded, total, piece, time, total_time):
+    percent_done = float(uploaded)/float(total)
+    percent_done_str = "%02d%%" % (percent_done * 100)
+    data_done = _format_size(uploaded)
+    elapsed = _format_secs(total_time)
+
+    speed = "- B/sec"
+    if (time):
+        if (uploaded != total):
+            speed = _format_size(float(piece)/float(time)) + "/sec"
+        else:
+            speed = _format_size(float(total)/float(total_time)) + "/sec"
+
+    # write formated string and flush
+    sys.stdout.write("[% -36s] % 4s % 8s % 10s % 14s\r" % ('='*(int(percent_done*36)), percent_done_str, elapsed, data_done, speed))
+    sys.stdout.flush()
+
 def build(args):
+    # We may not actually nave an srpm arg if we come directly from the build task
+    if hasattr(args, 'srpm') and args.srpm and not args.scratch:
+        log.error('Non-scratch builds cannot be from srpms.')
+        sys.exit(1)
+    # Place holder for if we build with an uploaded srpm or not
+    url = None
     if not args.user:
         # Doing a try doesn't really work since the fedora_cert library just
         # exits on error, but if that gets fixed this will work better.
@@ -242,12 +284,34 @@ def build(args):
     # Need to do something with BUILD_FLAGS or KOJI_FLAGS here for compat
     try:
         mymodule = fedpkg.PackageModule(args.path)
-        kojiconfig = _get_secondary_config(mymodule)
-        task_id = mymodule.build(args.user, args.skip_tag, args.scratch,
-                                 args.background, kojiconfig)
     except fedpkg.FedpkgError, e:
-        log.error('Could not build: %s' % e)
+        # This error needs a better print out
+        log.error('Could not use module: %s' % e)
         sys.exit(1)
+    kojiconfig = _get_secondary_config(mymodule)
+    try:
+        mymodule.init_koji(args.user, kojiconfig)
+    except fedpkg.FedpkgError, e:
+        log.error('Could not log into koji: %s' % e)
+        sys.exit(1)
+    # handle uploading the srpm if we got one
+    if hasattr(args, 'srpm') and args.srpm:
+        # Figure out if we want a verbose output or not
+        callback = None
+        if not args.q:
+            callback = _progress_callback
+        # define a unique path for this upload.  Stolen from /usr/bin/koji
+        uniquepath = 'cli-build/%r.%s' % (time.time(),
+                                         ''.join([random.choice(string.ascii_letters)
+                                                 for i in range(8)]))
+        # Should have a try here, not sure what errors we'll get yet though
+        mymodule.koji_upload(args.srpm, uniquepath, callback=callback)
+        if not args.q:
+            # print an extra blank line due to callback oddity
+            print('')
+        url = '%s/%s' % (uniquepath, os.path.basename(args.srpm))
+    # Should also try this, again not sure what errors to catch
+    task_id = mymodule.build(args.skip_tag, args.scratch, args.background, url)
     # Now that we have the task ID we need to deal with it.
     if args.nowait:
         # Log out of the koji session
@@ -407,8 +471,10 @@ def prep(args):
         sys.exit(1)
 
 def scratchbuild(args):
-    # not implimented
-    log.warning('Not implimented yet, got %s' % args)
+    # A scratch build is just a build with --scratch
+    args.scratch = True
+    args.skip_tag = False
+    build(args)
 
 def sources(args):
     try:
@@ -484,21 +550,26 @@ if __name__ == '__main__':
     parser_help = subparsers.add_parser('help', help = 'Show usage')
     parser_help.set_defaults(command = usage)
 
+    # Add a common build parser to be used as a parent
+    parser_build_common = subparsers.add_parser('build_common',
+                                                add_help = False)
+    parser_build_common.add_argument('--nowait', action = 'store_true',
+                                     default = False,
+                                     help = "Don't wait on build")
+    parser_build_common.add_argument('--background', action = 'store_true',
+                                     default = False,
+                                     help = 'Run the build at a lower priority')
+
     # build target
     parser_build = subparsers.add_parser('build',
-                                         help = 'Request build')
+                                         help = 'Request build',
+                                         parents = [parser_build_common])
     parser_build.add_argument('--skip-tag', action = 'store_true',
                               default = False,
                               help = 'Do not attempt to tag package')
     parser_build.add_argument('--scratch', action = 'store_true',
                               default = False,
                               help = 'Perform a scratch build')
-    parser_build.add_argument('--nowait', action = 'store_true',
-                              default = False,
-                              help = "Don't wait on build")
-    parser_build.add_argument('--background', action = 'store_true',
-                              default = False,
-                              help = 'Run the build at a lower priority')
     parser_build.set_defaults(command = build)
 
     # chain build
@@ -612,7 +683,8 @@ if __name__ == '__main__':
 
     # scratch build
     parser_scratchbuild = subparsers.add_parser('scratch-build',
-                                                help = 'Request scratch build')
+                                                help = 'Request scratch build',
+                                                parents = [parser_build_common])
     parser_scratchbuild.add_argument('--arches', nargs = '*',
                                      help = 'Build for specific arches')
     parser_scratchbuild.add_argument('--srpm', help='Build from srpm')
