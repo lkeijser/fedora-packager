@@ -229,6 +229,8 @@ class PackageModule:
         self.localarch = self._getlocalarch()
         # Set the default mock config to None, not all branches have a config
         self.mockconfig = None
+        # Set a place holder for kojisession
+        self.kojisession = None
         # Find the branch and set things based from that
         # Still requires a 'branch' file in each branch
         self.branch = self._findbranch()
@@ -271,11 +273,9 @@ class PackageModule:
         except git.errors.InvalidGitRepositoryError:
             raise FedpkgError('%s is not a valid repo' % path)
 
-    def build(self, user, skip_tag=False, scratch=False, background=False,
-              kojiconfig=None):
+    def build(self, skip_tag=False, scratch=False, background=False,
+              url=None):
         """Initiate a build of the module.  Available options are:
-
-        user: User to log into koji as
 
         skip_tag: Skip the tag action after the build
 
@@ -283,64 +283,29 @@ class PackageModule:
 
         background: Perform the build with a low priority
 
-        kojiconfig: Use an alternate koji config file
-
         This function submits the task to koji and returns the taskID
 
         It is up to the client to wait or watch the task.
 
         """
 
-        # Check to see if the tree is dirty
-        if self.repo.is_dirty:
-            raise FedpkgError('There are uncommitted changes in your repo')
-        # Need to check here to see if the local commit you want to build is
-        # pushed or not
-        # This doesn't work if the local branch name doesn't match the remote
-        if self.repo.git.rev_list('...origin/%s' % self.repo.active_branch):
-            raise FedpkgError('There are unpushed changes in your repo')
-        # Get the commit hash to build
-        commit = self.repo.commits(max_count=1)[0].id
+        # Make sure we have a valid session.
+        if not self.kojisession:
+            raise FedpkgError('No koji session found.')
         # construct the url
-        url = ANONGITURL % {'module': self.module} + '#%s' % commit
-        # Stealing a bunch of code from /usr/bin/koji here, too bad it isn't
-        # in a more usable library form
-        defaults = {
-                    'server' : 'http://localhost/kojihub',
-                    'weburl' : 'http://localhost/koji',
-                    'pkgurl' : 'http://localhost/packages',
-                    'topdir' : '/mnt/koji',
-                    'cert': '~/.koji/client.crt',
-                    'ca': '~/.koji/clientca.crt',
-                    'serverca': '~/.koji/serverca.crt',
-                    'authtype': None
-                    }
-        # Process the configs in order, global, user, then any option passed
-        configs = ['/etc/koji.conf', os.path.expanduser('~/.koji/config')]
-        if kojiconfig:
-            configs.append(os.path.join(kojiconfig))
-        for configFile in configs:
-            if os.access(configFile, os.F_OK):
-                f = open(configFile)
-                config = ConfigParser.ConfigParser()
-                config.readfp(f)
-                f.close()
-                if config.has_section('koji'):
-                    for name, value in config.items('koji'):
-                        if defaults.has_key(name):
-                            defaults[name] = value
-        # Expand out the directory options
-        for name in ('topdir', 'cert', 'ca', 'serverca'):
-            defaults[name] = os.path.expanduser(defaults[name])
-        session_opts = {'user': user}
-        # We assign the kojisession to our self as it can be used later to
-        # watch the tasks.
-        self.kojisession = koji.ClientSession(defaults['server'], session_opts)
-        # log in using ssl
-        self.kojisession.ssl_login(defaults['cert'], defaults['ca'],
-                                   defaults['serverca'])
-        if not self.kojisession.logged_in:
-            raise FedpkgError('Could not auth with koji as %s' % user)
+        if not url:
+            # We don't have a url, so build from the latest commit
+            # Check to see if the tree is dirty
+            if self.repo.is_dirty:
+                raise FedpkgError('There are uncommitted changes in your repo')
+            # Need to check here to see if the local commit you want to build is
+            # pushed or not
+            # This doesn't work if the local branch name doesn't match the remote
+            if self.repo.git.rev_list('...origin/%s' % self.repo.active_branch):
+                raise FedpkgError('There are unpushed changes in your repo')
+            # Get the commit hash to build
+            commit = self.repo.commits(max_count=1)[0].id
+            url = ANONGITURL % {'module': self.module} + '#%s' % commit
         # Check to see if the target is valid
         build_target = self.kojisession.getBuildTarget(self.target)
         if not build_target:
@@ -369,7 +334,7 @@ class PackageModule:
         task_id = self.kojisession.build(url, self.target, opts,
                                          priority=priority)
         log.info('Created task: %s' % task_id)
-        log.info('Task info: %s/taskinfo?taskID=%s' % (defaults['weburl'],
+        log.info('Task info: %s/taskinfo?taskID=%s' % (self.kojiweburl,
                                                        task_id))
         return task_id
 
@@ -474,6 +439,28 @@ class PackageModule:
                 return f
         raise FedpkgError('No spec file found.')
 
+    def koji_upload(self, file, path, callback=None):
+        """Upload a file to koji
+
+        file is the file you wish to upload
+
+        path is the relative path on the server to upload to
+
+        callback is the progress callback to use, if any
+
+        Returns nothing or raises
+
+        """
+
+        # See if we actually have a file
+        if not os.path.exists(file):
+            raise FedpkgError('No such file: %s' % file)
+        if not self.kojisession:
+            raise FedpkgError('No active koji session.')
+        # This should have a try and catch koji errors
+        self.kojisession.uploadWrapper(file, path, callback = callback)
+        return
+
     def init_koji(self, user, kojiconfig=None, url=None):
         """Initiate a koji session.  Available options are:
 
@@ -518,6 +505,8 @@ class PackageModule:
         # We assign the kojisession to our self as it can be used later to
         # watch the tasks.
         self.kojisession = koji.ClientSession(defaults['server'], session_opts)
+        # save the weburl for later use too
+        self.kojiweburl = defaults['weburl']
         # log in using ssl
         self.kojisession.ssl_login(defaults['cert'], defaults['ca'],
                                    defaults['serverca'])
