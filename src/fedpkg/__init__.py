@@ -474,6 +474,57 @@ class PackageModule:
                 return f
         raise FedpkgError('No spec file found.')
 
+    def init_koji(self, user, kojiconfig=None, url=None):
+        """Initiate a koji session.  Available options are:
+
+        user: User to log into koji as
+
+        kojiconfig: Use an alternate koji config file
+
+        This function attempts to log in and returns nothing or raises.
+
+        """
+
+        # Stealing a bunch of code from /usr/bin/koji here, too bad it isn't
+        # in a more usable library form
+        defaults = {
+                    'server' : 'http://localhost/kojihub',
+                    'weburl' : 'http://localhost/koji',
+                    'pkgurl' : 'http://localhost/packages',
+                    'topdir' : '/mnt/koji',
+                    'cert': '~/.koji/client.crt',
+                    'ca': '~/.koji/clientca.crt',
+                    'serverca': '~/.koji/serverca.crt',
+                    'authtype': None
+                    }
+        # Process the configs in order, global, user, then any option passed
+        configs = ['/etc/koji.conf', os.path.expanduser('~/.koji/config')]
+        if kojiconfig:
+            configs.append(os.path.join(kojiconfig))
+        for configFile in configs:
+            if os.access(configFile, os.F_OK):
+                f = open(configFile)
+                config = ConfigParser.ConfigParser()
+                config.readfp(f)
+                f.close()
+                if config.has_section('koji'):
+                    for name, value in config.items('koji'):
+                        if defaults.has_key(name):
+                            defaults[name] = value
+        # Expand out the directory options
+        for name in ('topdir', 'cert', 'ca', 'serverca'):
+            defaults[name] = os.path.expanduser(defaults[name])
+        session_opts = {'user': user}
+        # We assign the kojisession to our self as it can be used later to
+        # watch the tasks.
+        self.kojisession = koji.ClientSession(defaults['server'], session_opts)
+        # log in using ssl
+        self.kojisession.ssl_login(defaults['cert'], defaults['ca'],
+                                   defaults['serverca'])
+        if not self.kojisession.logged_in:
+            raise FedpkgError('Could not auth with koji as %s' % user)
+        return
+
     def install(self, arch=None, short=False):
         """Run rpm -bi on a module
 
