@@ -273,6 +273,10 @@ def build(args):
         sys.exit(1)
     # Place holder for if we build with an uploaded srpm or not
     url = None
+    # See if this is a chain or not
+    chain = None
+    if hasattr(args, 'chain'):
+        chain = args.chain
     if not args.user:
         # Doing a try doesn't really work since the fedora_cert library just
         # exits on error, but if that gets fixed this will work better.
@@ -311,7 +315,8 @@ def build(args):
             print('')
         url = '%s/%s' % (uniquepath, os.path.basename(args.srpm))
     # Should also try this, again not sure what errors to catch
-    task_id = mymodule.build(args.skip_tag, args.scratch, args.background, url)
+    task_id = mymodule.build(args.skip_tag, args.scratch, args.background,
+                             url, chain)
     # Now that we have the task ID we need to deal with it.
     if args.nowait:
         # Log out of the koji session
@@ -321,8 +326,43 @@ def build(args):
     return _watch_koji_tasks(mymodule.kojisession, [task_id], quiet=args.q)
 
 def chainbuild(args):
-    # not implimented
-    log.warning('Not implimented yet, got %s' % args)
+    try:
+        mymodule = pyfedpkg.PackageModule(args.path)
+    except pyfedpkg.FedpkgError, e:
+        log.error('Could not use module %s' % e)
+        sys.exit(1)
+    # make sure we don't try to chain ourself
+    if mymodule.module in args.package:
+        log.error('%s must not be in the chain' % mymodule.module)
+        sys.exit(1)
+    # Break the chain up into sections
+    urls = []
+    build_set = []
+    for component in args.package:
+        if component == ':':
+            if build_set:
+                # We've hit the end of a set, add the set as a unit to the
+                # url list and reset the build_set.
+                urls.append(build_set)
+                build_set = []
+        else:
+            # Figure out the scm url to build from package name
+            try:
+                hash = pyfedpkg.get_latest_commit(component)
+                url = pyfedpkg.ANONGITURL % {'module':
+                                             component} + '#%s' % hash
+                build_set.append(url)
+            except pyfedpkg.FedpkgError, e:
+                log.error('Could not get a build url for %s: %s'
+                          % (component, e))
+    # Take care of the last build set if we have one
+    if build_set:
+        urls.append(build_set)
+    # pass it off to build
+    args.chain = urls
+    args.skip_tag = False
+    args.scratch = False
+    build(args)
 
 def check(args):
     # not implimented
@@ -574,7 +614,22 @@ if __name__ == '__main__':
 
     # chain build
     parser_chainbuild = subparsers.add_parser('chain-build',
-                help = 'Build current package in order with other packages')
+                help = 'Build current package in order with other packages',
+                parents = [parser_build_common])
+    parser_chainbuild.add_argument('package', nargs = '+',
+                                   help = """
+Build current package in order with other packages
+example: fedpkg chain-build libwidget libgizmo
+The current package is added to the end of the CHAIN list.
+Colons (:) can be used in the CHAIN parameter to define groups of packages.
+Packages in any single group will be built in parallel and all packages in
+a group must build successfully and populate the repository before the next
+group will begin building.  For example:
+fedpkg chain-build libwidget libaselib : libgizmo :
+will cause libwidget and libaselib to be built in parallel, followed by
+libgizmo and then the currect directory package. If no groups are defined,
+packages will be built sequentially.
+""")
     parser_chainbuild.set_defaults(command = chainbuild)
 
     # check preps
