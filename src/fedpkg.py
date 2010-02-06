@@ -369,7 +369,7 @@ def chainbuild(args):
     build(args)
 
 def check(args):
-    # not implimented
+    # not implimented; Not planned
     log.warning('Not implimented yet, got %s' % args)
 
 def clean(args):
@@ -422,7 +422,7 @@ def compile(args):
         sys.exit(1)
 
 def export(args):
-    # not implimented
+    # not implimented; not planned
     log.warning('Not implimented yet, got %s' % args)
 
 def gimmespec(args):
@@ -545,7 +545,7 @@ def tagrequest(args):
     log.warning('Not implimented yet, got %s' % args)
 
 def unusedfedpatches(args):
-    # not implimented
+    # not implimented; not planned
     log.warning('Not implimented yet, got %s' % args)
 
 def unusedpatches(args):
@@ -636,10 +636,10 @@ packages will be built sequentially.
 """)
     parser_chainbuild.set_defaults(command = chainbuild)
 
-    # check preps
-    parser_check = subparsers.add_parser('check',
-                                help = 'Check test srpm preps on all arches')
-    parser_check.set_defaults(command = check)
+    # check preps; not planned
+    #parser_check = subparsers.add_parser('check',
+    #                            help = 'Check test srpm preps on all arches')
+    #parser_check.set_defaults(command = check)
 
     # clean things up
     parser_clean = subparsers.add_parser('clean',
@@ -678,10 +678,10 @@ packages will be built sequentially.
                                 help = 'short-circuit compile')
     parser_compile.set_defaults(command = compile)
 
-    # export the module
-    parser_export = subparsers.add_parser('export',
-                                          help = 'Create a clean export')
-    parser_export.set_defaults(command = export)
+    # export the module; not planned
+    #parser_export = subparsers.add_parser('export',
+    #                                      help = 'Create a clean export')
+    #parser_export.set_defaults(command = export)
 
     # gimmespec takes an optional path argument, defaults to cwd
     parser_gimmespec = subparsers.add_parser('gimmespec',
@@ -770,11 +770,11 @@ packages will be built sequentially.
                             help = 'Submit last build as a releng tag request')
     parser_tagrequest.set_defaults(command = tagrequest)
 
-    # Show unused Fedora patches
-    parser_unusedfedpatches = subparsers.add_parser('unused-fedora-patches',
-            help = 'Print Fedora patches not used by Patch and/or ApplyPatch'
-                   ' directives')
-    parser_unusedfedpatches.set_defaults(command = unusedfedpatches)
+    # Show unused Fedora patches; not planned
+    #parser_unusedfedpatches = subparsers.add_parser('unused-fedora-patches',
+    #        help = 'Print Fedora patches not used by Patch and/or ApplyPatch'
+    #               ' directives')
+    #parser_unusedfedpatches.set_defaults(command = unusedfedpatches)
 
     # Show unused patches
     parser_unusedpatches = subparsers.add_parser('unused-patches',
