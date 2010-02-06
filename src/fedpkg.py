@@ -357,6 +357,7 @@ def chainbuild(args):
             except pyfedpkg.FedpkgError, e:
                 log.error('Could not get a build url for %s: %s'
                           % (component, e))
+                sys.exit(1)
     # Take care of the last build set if we have one
     if build_set:
         log.debug('Created a build set: %s' % ' '.join(build_set))
