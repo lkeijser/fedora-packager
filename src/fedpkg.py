@@ -11,7 +11,7 @@
 # the full text of the license.
 
 import argparse
-import fedpkg
+import pyfedpkg
 import fedora_cert
 import os
 import sys
@@ -283,15 +283,15 @@ def build(args):
             args.user = os.getlogin()
     # Need to do something with BUILD_FLAGS or KOJI_FLAGS here for compat
     try:
-        mymodule = fedpkg.PackageModule(args.path)
-    except fedpkg.FedpkgError, e:
+        mymodule = pyfedpkg.PackageModule(args.path)
+    except pyfedpkg.FedpkgError, e:
         # This error needs a better print out
         log.error('Could not use module: %s' % e)
         sys.exit(1)
     kojiconfig = _get_secondary_config(mymodule)
     try:
         mymodule.init_koji(args.user, kojiconfig)
-    except fedpkg.FedpkgError, e:
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not log into koji: %s' % e)
         sys.exit(1)
     # handle uploading the srpm if we got one
@@ -336,16 +336,16 @@ def clean(args):
     if args.x:
         useignore = False
     try:
-        return fedpkg.clean(dry, useignore)
-    except fedpkg.FedpkgError, e:
+        return pyfedpkg.clean(dry, useignore)
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not clean: %s' % e)
         sys.exit(1)
 
 def clog(args):
     try:
-        mymodule = fedpkg.PackageModule(args.path)
+        mymodule = pyfedpkg.PackageModule(args.path)
         return mymodule.clog()
-    except fedpkg.FedpkgError, e:
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not generate clog: %s' % e)
         sys.exit(1)
 
@@ -359,9 +359,9 @@ def clone(args):
             log.debug('Could not read Fedora cert, using login name')
             args.user = os.getlogin()
     if args.branches:
-        fedpkg.clone_with_dirs(args.module[0], args.user)
+        pyfedpkg.clone_with_dirs(args.module[0], args.user)
     else:
-        fedpkg.clone(args.module[0], args.user, args.path, args.branch)
+        pyfedpkg.clone(args.module[0], args.user, args.path, args.branch)
 
 def compile(args):
     arch = None
@@ -371,9 +371,9 @@ def compile(args):
     if args.short_circuit:
         short = True
     try:
-        mymodule = fedpkg.PackageModule(args.path)
+        mymodule = pyfedpkg.PackageModule(args.path)
         return mymodule.compile(arch=arch, short=short)
-    except fedpkg.FedpkgError, e:
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not compile: %s' % e)
         sys.exit(1)
 
@@ -383,9 +383,9 @@ def export(args):
 
 def gimmespec(args):
     try:
-        mymodule = fedpkg.PackageModule(args.path)
+        mymodule = pyfedpkg.PackageModule(args.path)
         print(mymodule.spec)
-    except fedpkg.FedpkgError, e:
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not get spec file: %s' % e)
         sys.exit(1)
 
@@ -397,17 +397,17 @@ def install(args):
     if args.short_circuit:
         short = True
     try:
-        mymodule = fedpkg.PackageModule(args.path)
+        mymodule = pyfedpkg.PackageModule(args.path)
         return mymodule.install(arch=arch, short=short)
-    except fedpkg.FedpkgError, e:
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not install: %s' % e)
         sys.exit(1)
 
 def lint(args):
     try:
-        mymodule = fedpkg.PackageModule(args.path)
+        mymodule = pyfedpkg.PackageModule(args.path)
         return mymodule.lint()
-    except fedpkg.FedpkgError, e:
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not run rpmlint: %s' % e)
         sys.exit(1)
 
@@ -416,12 +416,12 @@ def local(args):
     if args.arch:
         arch = args.arch
     try:
-        mymodule = fedpkg.PackageModule(args.path)
+        mymodule = pyfedpkg.PackageModule(args.path)
         if args.md5:
             return mymodule.local(arch=arch, hashtype='md5')
         else:
             return mymodule.local(arch=arch)
-    except fedpkg.FedpkgError, e:
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not build locally: %s' % e)
         sys.exit(1)
 
@@ -434,24 +434,24 @@ def mockbuild(args):
         # there were no args
         pass
     try:
-        mymodule = fedpkg.PackageModule(args.path)
+        mymodule = pyfedpkg.PackageModule(args.path)
         return mymodule.mockbuild(mockargs)
-    except fedpkg.FedpkgError, e:
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not run mockbuild: %s' % e)
         sys.exit(1)
 
 def new(args):
     try:
-        print(fedpkg.new(args.path))
-    except fedpkg.FedpkgError, e:
+        print(pyfedpkg.new(args.path))
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not get new changes: %s' % e)
         sys.exit(1)
 
 def new_sources(args):
     try:
-        mymodule = fedpkg.PackageModule(args.path)
+        mymodule = pyfedpkg.PackageModule(args.path)
         mymodule.new_sources(args.files)
-    except fedpkg.FedpkgError, e:
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not upload new sources: %s' % e)
         sys.exit(1)
 
@@ -464,9 +464,9 @@ def prep(args):
     if args.arch:
         arch = args.arch
     try:
-        mymodule = fedpkg.PackageModule(args.path)
+        mymodule = pyfedpkg.PackageModule(args.path)
         return mymodule.prep(arch=arch)
-    except fedpkg.FedpkgError, e:
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not prep: %s' % e)
         sys.exit(1)
 
@@ -478,21 +478,21 @@ def scratchbuild(args):
 
 def sources(args):
     try:
-        mymodule = fedpkg.PackageModule(args.path)
+        mymodule = pyfedpkg.PackageModule(args.path)
         mymodule.sources(args.outdir)
-    except fedpkg.FedpkgError, e:
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not download sources: %s' % e)
         sys.exit(1)
 
 def srpm(args):
     try:
-        mymodule = fedpkg.PackageModule(args.path)
+        mymodule = pyfedpkg.PackageModule(args.path)
         mymodule.sources(args.path)
         if args.md5:
             mymodule.srpm('md5')
         else:
             mymodule.srpm()
-    except fedpkg.FedpkgError, e:
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not make an srpm: %s' % e)
         sys.exit(1)
 
@@ -506,9 +506,9 @@ def unusedfedpatches(args):
 
 def unusedpatches(args):
     try:
-        mymodule = fedpkg.PackageModule(args.path)
+        mymodule = pyfedpkg.PackageModule(args.path)
         unused = mymodule.unused_patches()
-    except fedpkg.FedpkgError, e:
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not get unused patches: %s' % e)
         sys.exit(1)
     print('\n'.join(unused))
@@ -519,8 +519,8 @@ def update(args):
 
 def verrel(args):
     try:
-        mymodule = fedpkg.PackageModule(args.path)
-    except fedpkg.FedpkgError, e:
+        mymodule = pyfedpkg.PackageModule(args.path)
+    except pyfedpkg.FedpkgError, e:
         log.error('Could not get ver-rel: %s' % e)
         sys.exit(1)
     print('%s-%s-%s' % (mymodule.module, mymodule.ver, mymodule.rel))
@@ -737,7 +737,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # setup the logger
-    log = fedpkg.log
+    log = pyfedpkg.log
     if args.v:
         log.setLevel(logging.DEBUG)
     elif args.q:
