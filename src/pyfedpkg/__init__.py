@@ -187,6 +187,24 @@ def clone_with_dirs(module, user):
           (module, user))
     return
 
+def get_latest_commit(module):
+    """Discover the latest commit has for a given module and return it"""
+
+    # This is stupid that I have to use subprocess :/
+    url = ANONGITURL % {'module': module}
+    cmd = ['git', 'ls-remote', url, 'master']
+    try :
+        proc = subprocess.Popen(cmd, stderr=subprocess.PIPE,
+                                stdout=subprocess.PIPE)
+        output, error = proc.communicate()
+    except OSError, e:
+        raise FedpkgError(e)
+    if error:
+        raise FedpkgError('Got an error finding head for %s: %s' %
+                          (module, error))
+    # Return the hash sum
+    return output.split()[0]
+
 def new(path=os.getcwd()):
     """Return changes in a repo since the last tag"""
 
