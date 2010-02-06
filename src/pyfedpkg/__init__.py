@@ -343,8 +343,10 @@ class PackageModule:
         if chain:
             ancestors = self.kojisession.getFullInheritance(build_target['build_tag'])
             if dest_tag['id'] not in [build_target['build_tag']] + [ancestor['parent_id'] for ancestor in ancestors]:
-                raise FedpkgError('Packages in destination tag %(dest_tag_name)s \
-                are not inherited by build tag %(build_tag_name)s' % build_target)
+                raise FedpkgError('Packages in destination tag ' \
+                                  '%(dest_tag_name)s are not inherited by' \
+                                  'build tag %(build_tag_name)s' %
+                                  build_target)
         # define our dictionary for options
         opts = {}
         # Set a placeholder for the build priority
@@ -356,16 +358,19 @@ class PackageModule:
         if background:
             priority = 5 # magic koji number :/
 
-        log.debug('Building %s for %s with options %s and a priority of %s' %
-                  (url, self.target, opts, priority))
         # Now submit the task and get the task_id to return
         # Handle the chain build version
         if chain:
             chain[-1].append(url)
+            log.debug('Building chain %s for %s with options %s and a ' \
+                      'priority of %s' %
+                      (chain, self.target, opts, priority))
             task_id = self.kojisession.chainBuild(chain, self.target, opts,
                                                   priority=priority)
         # Now handle the normal build
         else:
+            log.debug('Building %s for %s with options %s and a priority of %s' %
+                      (url, self.target, opts, priority))
             task_id = self.kojisession.build(url, self.target, opts,
                                              priority=priority)
         log.info('Created task: %s' % task_id)
