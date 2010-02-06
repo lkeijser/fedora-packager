@@ -292,7 +292,7 @@ class PackageModule:
             raise FedpkgError('%s is not a valid repo' % path)
 
     def build(self, skip_tag=False, scratch=False, background=False,
-              url=None):
+              url=None, chain=None):
         """Initiate a build of the module.  Available options are:
 
         skip_tag: Skip the tag action after the build
@@ -300,6 +300,10 @@ class PackageModule:
         scratch: Perform a scratch build
 
         background: Perform the build with a low priority
+
+        url: A url to an uploaded srpm to build from
+
+        chain: A chain build set
 
         This function submits the task to koji and returns the taskID
 
@@ -335,6 +339,12 @@ class PackageModule:
                               build_target['dest_tag_name'])
         if dest_tag['locked'] and not scratch:
             raise FedpkgError('Destination tag %s is locked' % dest_tag['name'])
+        # If we're chain building, make sure inheritance works
+        if chain:
+            ancestors = self.kojisession.getFullInheritance(build_target['build_tag'])
+            if dest_tag['id'] not in [build_target['build_tag']] + [ancestor['parent_id'] for ancestor in ancestors]:
+                raise FedpkgError('Packages in destination tag %(dest_tag_name)s \
+                are not inherited by build tag %(build_tag_name)s' % build_target)
         # define our dictionary for options
         opts = {}
         # Set a placeholder for the build priority
@@ -349,8 +359,15 @@ class PackageModule:
         log.debug('Building %s for %s with options %s and a priority of %s' %
                   (url, self.target, opts, priority))
         # Now submit the task and get the task_id to return
-        task_id = self.kojisession.build(url, self.target, opts,
-                                         priority=priority)
+        # Handle the chain build version
+        if chain:
+            chain[-1].append(url)
+            task_id = self.kojisession.chainBuild(chain, self.target, opts,
+                                                  priority=priority)
+        # Now handle the normal build
+        else:
+            task_id = self.kojisession.build(url, self.target, opts,
+                                             priority=priority)
         log.info('Created task: %s' % task_id)
         log.info('Task info: %s/taskinfo?taskID=%s' % (self.kojiweburl,
                                                        task_id))
