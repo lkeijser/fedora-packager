@@ -361,6 +361,7 @@ class PackageModule:
         # Now submit the task and get the task_id to return
         # Handle the chain build version
         if chain:
+            log.debug('Adding %s to the chain' % url)
             chain[-1].append(url)
             log.debug('Building chain %s for %s with options %s and a ' \
                       'priority of %s' %

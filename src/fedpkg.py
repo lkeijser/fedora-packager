@@ -338,12 +338,14 @@ def chainbuild(args):
     # Break the chain up into sections
     urls = []
     build_set = []
+    log.debug('Processing chain %s' % ' '.join(args.package))
     for component in args.package:
         if component == ':':
             if build_set:
                 # We've hit the end of a set, add the set as a unit to the
                 # url list and reset the build_set.
                 urls.append(build_set)
+                log.debug('Created a build set: %s' % ' '.join(build_set))
                 build_set = []
         else:
             # Figure out the scm url to build from package name
@@ -357,6 +359,7 @@ def chainbuild(args):
                           % (component, e))
     # Take care of the last build set if we have one
     if build_set:
+        log.debug('Created a build set: %s' % ' '.join(build_set))
         urls.append(build_set)
     # pass it off to build
     args.chain = urls
