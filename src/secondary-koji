@@ -1,0 +1,13 @@
+#! /bin/sh
+
+arch=`basename $0 | cut -d '-' -f 1`
+
+config="$HOME/.koji/${arch}-config"
+
+if [ ! -f $config ]; then
+    echo "Config file for $arch doesn't exist"
+    echo "run fedora-packager-setup and try again"
+    exit 1
+fi
+
+koji -c $config "$@"

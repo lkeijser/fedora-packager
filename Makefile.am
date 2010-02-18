@@ -5,7 +5,12 @@ bin_SCRIPTS = fedora-cvs \
 	fedora-getsvn \
 	fedora-hosted \
 	rpmbuild-md5 \
-	fedpkg
+	fedpkg \
+	sparc-koji \
+	s390-koji \
+	arm-koji \
+	ppc-koji
+
 CLEANFILES = $(bin_SCRIPTS)
 EXTRA_DIST = src/fedora-cvs.py \
 	src/fedora-packager-setup.py \
@@ -14,7 +19,8 @@ EXTRA_DIST = src/fedora-cvs.py \
 	src/fedora-getsvn \
 	src/fedora-hosted.py \
 	src/rpmbuild-md5 \
-	src/fedpkg.py
+	src/fedpkg.py \
+	src/secondary-koji
 
 fedora-cvs: $(srcdir)/src/fedora-cvs.py
 	rm -f fedora-cvs
@@ -47,6 +53,22 @@ rpmbuild-md5: $(srcdir)/src/rpmbuild-md5
 fedpkg: $(srcdir)/src/fedpkg.py
 	rm -f fedpkg
 	install -p -m 755 -T $(srcdir)/src/fedpkg.py fedpkg
+
+sparc-koji: $(srcdir)/src/secondary-koji
+	rm -f sparc-koji
+	install -p -m 755 -T $(srcdir)/src/secondary-koji sparc-koji
+
+arm-koji: $(srcdir)/src/secondary-koji
+	rm -f arm-koji
+	install -p -m 755 -T $(srcdir)/src/secondary-koji arm-koji
+
+s390-koji: $(srcdir)/src/secondary-koji
+	rm -f s390-koji
+	install -p -m 755 -T $(srcdir)/src/secondary-koji s390-koji
+
+ppc-koji: $(srcdir)/src/secondary-koji
+	rm -f ppc-koji
+	install -p -m 755 -T $(srcdir)/src/secondary-koji ppc-koji
 
 pyfedpkg_PYTHON = $(wildcard $(srcdir)/src/pyfedpkg/*.py)
 fedora_cert_PYTHON = $(wildcard $(srcdir)/src/fedora_cert/*.py)
