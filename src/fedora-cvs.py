@@ -4,40 +4,10 @@ import commands
 import optparse
 import os
 import sys
+import fedora_cert
 from subprocess import *
 
-from OpenSSL import crypto
-
 PKG_ROOT = 'cvs.fedoraproject.org:/cvs/pkgs'
-
-
-def read_cert_user():
-    """Figure out the Fedora user name from ~/.fedora.cert. uses PyOpenSSL
-    """
-    cert_file = os.path.join(os.path.expanduser('~'), ".fedora.cert")
-    #if there is no user cert return None so that we default to anonymous checkout
-    if not os.access(cert_file, os.F_OK):
-        print "!!!    You don't have a ~/.fedora.cert file   !!!"
-        return None
-
-    # Make sure we can even read the user cert if its there 
-    if not os.access(cert_file, os.R_OK):
-        print "!!!    cannot read your ~/.fedora.cert file   !!!"
-        print "!!! Ensure the file is readable and try again !!!"
-        sys.exit(1)
-
-    user_cert = open(cert_file, "r").read()
-    my_cert = crypto.load_certificate(crypto.FILETYPE_PEM, user_cert)
-
-    if my_cert.has_expired():
-        print "Certificate expired; please get a new one."
-        sys.exit(1)
-
-    subject = str(my_cert.get_subject())
-    subject_line = subject.split("CN=")
-    cn_parts = subject_line[1].split("/")
-
-    return cn_parts[0]
 
 
 def main(user, pkg_list):
@@ -73,6 +43,6 @@ if __name__ == '__main__':
     if opts.anon:
         user = None
     else:
-        user = read_cert_user()
+        user = fedora_cert.read_user_cert()
 
     main(user, pkgs)
