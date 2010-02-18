@@ -1,6 +1,10 @@
+%if ! (0%{?fedora} > 12 || 0%{?rhel} > 5)
+%{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")}
+%endif
+
 Name:           fedora-packager
-Version:        0.3.8
-Release:        1%{?dist}
+Version:        0.4.0
+Release:        0.1%{?dist}
 Summary:        Tools for setting up a fedora maintainer environment
 
 Group:          Applications/Productivity
@@ -9,6 +13,7 @@ URL:            https://fedorahosted.org/fedora-packager
 Source0:        https://fedorahosted.org/releases/f/e/fedora-packager/fedora-packager-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
+BuildRequires:  python-devel
 Requires:       koji bodhi-client 
 Requires:       rpm-build rpmdevtools rpmlint
 Requires:       mock cvs curl wget
@@ -48,9 +53,15 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/fedora-getsvn
 %{_bindir}/fedora-hosted
 %{_bindir}/rpmbuild-md5
-
+%{_bindir}/fedpkg
+%{python_sitelib}/pyfedpkg
+%{python_sitelib}/fedora_cert
 
 %changelog
+* Thu Feb 18 2010 Dennis Gilmore <dennis@ausil.us> - 0.4.0-0.1
+- test build for 0.4.0
+- adds libraries for fedpkg and fedora_cert
+
 * Tue Aug 04 2009 Jesse Keating <jkeating@redhat.com> - 0.3.8-1
 - Add fedora-hosted and require offtrac
 
