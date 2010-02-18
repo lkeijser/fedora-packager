@@ -46,14 +46,7 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root,-)
 %doc COPYING TODO AUTHORS ChangeLog
-%{_bindir}/fedora-packager-setup
-%{_bindir}/fedora-cvs
-%{_bindir}/fedoradev-pkgowners
-%{_bindir}/fedora-cert
-%{_bindir}/fedora-getsvn
-%{_bindir}/fedora-hosted
-%{_bindir}/rpmbuild-md5
-%{_bindir}/fedpkg
+%{_bindir}/*
 %{python_sitelib}/pyfedpkg
 %{python_sitelib}/fedora_cert
 
