@@ -18,6 +18,9 @@ from fedora.client import AuthError, ServerError
 from OpenSSL import crypto
 import urlgrabber
 
+# Define our own error class
+class fedora_cert_error(Exception):
+    pass
 
 def _open_cert():
     """
@@ -26,9 +29,8 @@ def _open_cert():
      # Make sure we can even read the thing.
     cert_file = os.path.join(os.path.expanduser('~'), ".fedora.cert")
     if not os.access(cert_file, os.R_OK):
-        print "!!!    cannot read your ~/.fedora.cert file   !!!"
-        print "!!! Ensure the file is readable and try again !!!"
-        sys.exit(1)
+        raise fedora_cert_error("""!!!    cannot read your ~/.fedora.cert file   !!!
+!!! Ensure the file is readable and try again !!!"""
     raw_cert = open(cert_file).read()
     my_cert = crypto.load_certificate(crypto.FILETYPE_PEM, raw_cert)
     return my_cert
@@ -79,26 +81,20 @@ def create_user_cert(username=None):
     try:
         fas = AccountSystem('https://admin.fedoraproject.org/accounts/', username=username, password=password)
     except AuthError:
-        print "Invalid username/password."
-        sys.exit(1)
+        raise fedora_cert_error("Invalid username/password.")
 
     try:
         cert = fas.user_gencert()
         fas.logout()
     except CLAError:
-        print "You must sign the CLA before you can generate your certificate.\n" \
-            "To do this, go to https://admin.fedoraproject.org/accounts/cla/"
         fas.logout()
-        sys.exit(1)
+        raise fedora_cert_error("""You must sign the CLA before you can generate your certificate.\n
+To do this, go to https://admin.fedoraproject.org/accounts/cla/""")
     cert_file = os.path.join(os.path.expanduser('~'), ".fedora.cert")
     try:
         FILE = open(cert_file,"w")
         FILE.write(cert)
         FILE.close()
     except:
-        print """Can not open cert file for writing.
-Please paste certificate into ~/.fedora.cert"""
-       
-        print cert
-        sys.exit(1)
-
+        raise fedora_cert_error("""Can not open cert file for writing.
+Please paste certificate into ~/.fedora.cert\n\n%s""" % cert)
