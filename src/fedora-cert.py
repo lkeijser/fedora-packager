@@ -20,25 +20,25 @@ def main(opts):
     # gets us existing acc info
     if not opts.username:
         try:
-            username = read_user_cert()
+            username = fedora_cert.read_user_cert()
         except :
             print "Can't determine fas name, lets get a new cert"
-            create_user_cert(None)
+            fedora_cert.create_user_cert(None)
             sys.exit(0)
     else:
         username = opts.username
     #has cert expired? do we force a new cert? get a new one
     if opts.newcert:
         print "Getting a new User Certificate"
-        create_user_cert(username)
+        fedora_cert.create_user_cert(username)
         sys.exit(0)
-    if certificate_expired():
+    if fedora_cert.certificate_expired():
         print "Certificate has expired, getting a new one"
-        create_user_cert(username)
+        fedora_cert.create_user_cert(username)
         sys.exit(0)
     if opts.verifycert:
         print "Verifying Certificate"
-
+        print "Not implemented yet"
      
 if __name__ == '__main__':
     opt_p = optparse.OptionParser(usage="%prog [OPTIONS] ")
