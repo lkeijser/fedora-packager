@@ -38,6 +38,7 @@ def main(opts):
         sys.exit(0)
     if opts.verifycert:
         print "Verifying Certificate"
+        fedora_cert.verify_cert()
         print "Not implemented yet"
      
 if __name__ == '__main__':

@@ -17,6 +17,7 @@ from fedora.client.fas2 import CLAError
 from fedora.client import AuthError, ServerError
 from OpenSSL import crypto
 import urlgrabber
+import datetime
 
 # Define our own error class
 class fedora_cert_error(Exception):
@@ -30,7 +31,7 @@ def _open_cert():
     cert_file = os.path.join(os.path.expanduser('~'), ".fedora.cert")
     if not os.access(cert_file, os.R_OK):
         raise fedora_cert_error("""!!!    cannot read your ~/.fedora.cert file   !!!
-!!! Ensure the file is readable and try again !!!"""
+!!! Ensure the file is readable and try again !!!""")
     raw_cert = open(cert_file).read()
     my_cert = crypto.load_certificate(crypto.FILETYPE_PEM, raw_cert)
     return my_cert
@@ -44,8 +45,16 @@ def verify_cert():
     """
     my_cert = _open_cert()
     serial_no = my_cert.get_serial_number()
-    valid_until = my_cert.get_notAfter()
+    valid_until = my_cert.get_notAfter()[:8]
     crl = urlgrabber.urlread("https://admin.fedoraproject.org/ca/crl.pem")
+    dateFmt = '%Y%m%d'
+    delta = datetime.datetime.now() + datetime.timedelta(days=21)
+    warn = datetime.datetime.strftime(delta, dateFmt)
+
+    print 'cert expires: %s-%s-%s' % (valid_until[:4], valid_until[4:6], valid_until[6:8])
+
+    if valid_until < warn:
+        print 'WARNING: Your cert expires soon.'
 
 
 def certificate_expired():
