@@ -13,7 +13,7 @@
 import optparse
 import fedora_cert
 import urlgrabber
-
+import sys
 
 def main(opts):
     # lets read in the existing cert if it exists.
@@ -39,7 +39,7 @@ def main(opts):
     if opts.verifycert:
         print "Verifying Certificate"
         fedora_cert.verify_cert()
-        print "Not implemented yet"
+        print "CRL Checking not implemented yet"
      
 if __name__ == '__main__':
     opt_p = optparse.OptionParser(usage="%prog [OPTIONS] ")
