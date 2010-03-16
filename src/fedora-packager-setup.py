@@ -108,13 +108,13 @@ def main():
     server_ca_cert = os.path.join(user_home, '.fedora-server-ca.cert')
     if not os.path.isfile(user_cert):
         print '''You need a client certificate from the Fedora Account System, lets get one now'''
-        create_user_cert()
+        fedora_cert.create_user_cert()
     else:
         #check if the cert has expired  if it has lets get a new one
-        if certificate_expired():
-            username = read_user_cert()
+        if fedora_cert.certificate_expired():
+            username = fedora_cert.read_user_cert()
             print "Certificate has expired, getting a new one"
-            create_user_cert(username)
+            fedora_cert.create_user_cert(username)
 
     download_cert('https://admin.fedoraproject.org/accounts/fedora-server-ca.cert', server_ca_cert)
     if not os.path.islink(upload_ca_cert):
