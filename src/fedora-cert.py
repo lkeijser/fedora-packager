@@ -21,7 +21,7 @@ def main(opts):
     if not opts.username:
         try:
             username = fedora_cert.read_user_cert()
-        except :
+        except:
             print "Can't determine fas name, lets get a new cert"
             fedora_cert.create_user_cert(None)
             sys.exit(0)
