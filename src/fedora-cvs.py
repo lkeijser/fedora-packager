@@ -12,15 +12,17 @@ PKG_ROOT = 'cvs.fedoraproject.org:/cvs/pkgs'
 
 def main(user, pkg_list):
     if user is not None:
-        cvs_env = "CVSROOT=:ext:%s@%s CVS_RSH=ssh" % (user, PKG_ROOT)
+        cvs_env = "CVS_RSH=ssh"
+        cvs_root = ":ext:%s@%s" % (user, PKG_ROOT)
     else:
-        cvs_env = "CVSROOT=:pserver:anonymous@" + PKG_ROOT
+        cvs_env = ""
+        cvs_root = ":pserver:anonymous@" + PKG_ROOT
 
     for module in pkg_list:
         print "Checking out %s from fedora CVS as %s:" % \
             (module, user or "anonymous")
         try:
-            retcode = call("%s /usr/bin/cvs co %s" % (cvs_env, module), shell=True)
+            retcode = call("%s /usr/bin/cvs -d %s co %s" % (cvs_env, cvs_root, module), shell=True)
             if retcode < 0:
                 print >>sys.stderr, "CVS Checkout failed Error:", -retcode
         except OSError, e:
