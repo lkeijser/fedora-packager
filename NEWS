@@ -1,3 +1,10 @@
+Mar 23 2010
+0.4.2  minor bugfix release
+adds missing fedora_cert. in fedora-packager-setup bz#573941
+Require python-argparse for fedpkg bz#574206
+Require make and openssh-clients bz#542209
+Patch to make cvs checkouts more robust bz#569954
+
 Jan 05 2010
 Moved repo to git
 work started by Jesse on fedpkg as a replacement for the old Makefiles

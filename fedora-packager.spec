@@ -3,8 +3,8 @@
 %endif
 
 Name:           fedora-packager
-Version:        0.4.0
-Release:        0.1%{?dist}
+Version:        0.4.2
+Release:        1%{?dist}
 Summary:        Tools for setting up a fedora maintainer environment
 
 Group:          Applications/Productivity
@@ -16,10 +16,11 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildRequires:  python-devel
 Requires:       koji bodhi-client 
 Requires:       rpm-build rpmdevtools rpmlint
-Requires:       mock cvs curl wget
+Requires:       mock cvs curl wget make openssh-clients
 Requires:       pyOpenSSL python-pycurl
 Requires:       redhat-rpm-config
 Requires:       python-offtrac
+Requires:       GitPython python-argparse
 
 BuildArch:      noarch
 
@@ -51,9 +52,22 @@ rm -rf $RPM_BUILD_ROOT
 %{python_sitelib}/fedora_cert
 
 %changelog
-* Thu Feb 18 2010 Dennis Gilmore <dennis@ausil.us> - 0.4.0-0.1
-- test build for 0.4.0
-- adds libraries for fedpkg and fedora_cert
+* Tue Mar 23 2010 Dennis Gilmore <dennis@ausil.us> - 0.4.2-1
+- update to 0.4.2
+- adds missing fedora_cert. in fedora-packager-setup bz#573941
+- Require python-argparse for fedpkg bz#574206
+- Require make and openssh-clients bz#542209
+- Patch to make cvs checkouts more robust bz#569954
+
+* Wed Mar 03 2010 Dennis Gilmore <dennis@ausil.us> - 0.4.1-1
+- update to 0.4.1 
+- adds a missing "import sys" from fedora-cert bz#570370
+- Require GitPython for fedpkg
+
+* Fri Feb 26 2010 Dennis Gilmore <dennis@ausil.us> - 0.4.0-1
+- update to 0.4.0 adds fedpkg 
+- make a fedora_cert python library 
+- add basic date check for certs 
 
 * Tue Aug 04 2009 Jesse Keating <jkeating@redhat.com> - 0.3.8-1
 - Add fedora-hosted and require offtrac

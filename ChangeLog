@@ -1,25 +1,46 @@
+* Dennis Gilmore <dennis@ausil.us> - 0.4.2
+- adds missing fedora_cert. in fedora-packager-setup bz#573941
+- Require python-argparse for fedpkg bz#574206
+- Require make and openssh-clients bz#542209
+- Patch to make cvs checkouts more robust bz#569954
+
+* Dennis Gilmore <dennis@ausil.us> - 0.4.1
+- add a missing "import sys" from fedora-cert bz#570370
+- Require GitPython for fedpkg
+
+* Dennis Gilmore <dennis@ausil.us> - 0.4.0-1
+- add fedpkg
+- make a fedora_cert python library
+- add basic date check for certs
+
 * Jesse Keating <jkeating@redhat.com> - 0.3.8
 - add fedora-hosted
+
 * Dennis Gilmore <dennis@ausil.us> - 0.3.7
 - make sure user_cert is defined before refrencing it in fedora-cvs.py
+
 * Dennis Gilmore <dennis@ausil.us> - 0.3.6
 - default to annonymous checkout when there is no user cert RH BZ#514108
 - quote the passed arcuments to rpmbuild to make sure args get passed
 correctly RH BZ#513269
+
 * Dennis Gilmore <dennis@ausil.us> - 0.3.5
 - script for doing svn checkouts
 - add rpmbuild-md5
 - download usercerts
+
 * Dennis Gilmore <dennis@ausil.us> - 0.3.1
 - allow annonymouse cvs checkouts
 - always get new ca certs
 * Dennis Gilmore <dennis@ausil.us> - 0.3.0
 - use pyOpenSSL to determine username
 - make sure cert is valid
+
 * Dennis Gilmore <dennis@ausil.us> - 0.2.0
 - fedora-cvs now allows checking out multiple modules
 - update urls for fedorahosted
 - update for fas2
+
 * Dennis Gilmore <dennis@ausil.us> - 0.1
 - Initial release we have a comps group 
 - fedora-packager-setup.sh and fedora-cvs
