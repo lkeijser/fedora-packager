@@ -271,7 +271,7 @@ class PackageModule:
             self.target = 'dist-olpc%s' % self.distval
         # Need to do something about no branch here
         elif self.branch == 'devel':
-            self.distval = '13' # this is hardset for now, which is bad
+            self.distval = '14' # this is hardset for now, which is bad
             self.distvar = 'fedora'
             self.dist = '.fc%s' % self.distval
             self.target = 'dist-f%s' % self.distval # will be dist-rawhide
