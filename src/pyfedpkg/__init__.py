@@ -327,7 +327,7 @@ class PackageModule:
                 raise FedpkgError('There are unpushed changes in your repo')
             # Get the commit hash to build
             commit = self.repo.commits(max_count=1)[0].id
-            url = ANONGITURL % {'module': self.module} + '#%s' % commit
+            url = ANONGITURL % {'module': self.module} + '?#%s' % commit
         # Check to see if the target is valid
         build_target = self.kojisession.getBuildTarget(self.target)
         if not build_target:
