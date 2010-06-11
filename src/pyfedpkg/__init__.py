@@ -538,6 +538,10 @@ class PackageModule:
                 if config.has_section('koji'):
                     for name, value in config.items('koji'):
                         if defaults.has_key(name):
+                            # HAAACK to force use of the stg environment
+                            if value.startswith('http://koji.fedoraproject.org'):
+                                value = value.replace('http://koji.fedoraproject.org',
+                                                      'http://koji.stg.fedoraproject.org')
                             defaults[name] = value
         # Expand out the directory options
         for name in ('topdir', 'cert', 'ca', 'serverca'):
