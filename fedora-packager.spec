@@ -3,7 +3,7 @@
 %endif
 
 Name:           fedora-packager
-Version:        0.4.2
+Version:        0.4.2.1
 Release:        1%{?dist}
 Summary:        Tools for setting up a fedora maintainer environment
 
@@ -52,6 +52,11 @@ rm -rf $RPM_BUILD_ROOT
 %{python_sitelib}/fedora_cert
 
 %changelog
+* Mon Jun 14 2010 Dennis Gilmore <dennis@ausil.us> - 0.4.2.1-1
+- set devel for F-14
+- point builds to koji.stg
+- correctly create a git url for koji
+
 * Tue Mar 23 2010 Dennis Gilmore <dennis@ausil.us> - 0.4.2-1
 - update to 0.4.2
 - adds missing fedora_cert. in fedora-packager-setup bz#573941

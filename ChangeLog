@@ -1,3 +1,8 @@
+* Mon Jun 14 2010 Dennis Gilmore <dennis@ausil.us> - 0.4.2.1
+- set devel for F-14
+- point builds to koji.stg
+- correctly create a git url for koji
+
 * Dennis Gilmore <dennis@ausil.us> - 0.4.2
 - adds missing fedora_cert. in fedora-packager-setup bz#573941
 - Require python-argparse for fedpkg bz#574206
