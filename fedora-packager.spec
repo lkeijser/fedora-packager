@@ -20,7 +20,7 @@ Requires:       mock cvs curl wget make openssh-clients
 Requires:       pyOpenSSL python-pycurl
 Requires:       redhat-rpm-config
 Requires:       python-offtrac
-Requires:       GitPython python-argparse
+Requires:       GitPython >= 0.2.0, python-argparse
 
 BuildArch:      noarch
 
