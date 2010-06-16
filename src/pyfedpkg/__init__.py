@@ -318,7 +318,7 @@ class PackageModule:
         if not url:
             # We don't have a url, so build from the latest commit
             # Check to see if the tree is dirty
-            if self.repo.is_dirty:
+            if self.repo.is_dirty():
                 raise FedpkgError('There are uncommitted changes in your repo')
             # Need to check here to see if the local commit you want to build is
             # pushed or not
@@ -326,7 +326,7 @@ class PackageModule:
             if self.repo.git.rev_list('...origin/%s' % self.repo.active_branch):
                 raise FedpkgError('There are unpushed changes in your repo')
             # Get the commit hash to build
-            commit = self.repo.commits(max_count=1)[0].id
+            commit = self.repo.iter_commits().next().sha
             url = ANONGITURL % {'module': self.module} + '?#%s' % commit
         # Check to see if the target is valid
         build_target = self.kojisession.getBuildTarget(self.target)
