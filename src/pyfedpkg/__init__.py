@@ -245,7 +245,7 @@ def clean(dry=False, useignore=True):
         log.error(error)
     return proc.returncode
 
-def clone(module, user, path=os.getcwd(), branch=None):
+def clone(module, user, path=os.getcwd(), branch=None, bare_dir=None):
     """Clone a repo, optionally check out a specific branch.
 
     module is the name of the module to clone
@@ -263,16 +263,22 @@ def clone(module, user, path=os.getcwd(), branch=None):
     # Create the command
     cmd = ['git', 'clone']
     # do the clone
-    if branch:
+    if branch and bare_dir:
+        log.debug('Cloning %s bare with branch %s' % (giturl, branch))
+        cmd.extend(['--branch', branch, '--bare', giturl, bare_dir])
+    elif branch:
         log.debug('Cloning %s with branch %s' % (giturl, branch))
-        cmd.extend(['--branch', branch])
+        cmd.extend(['--branch', branch, giturl])
+    elif bare_dir:
+        log.debug('Cloning %s bare' % giturl)
+        cmd.extend(['--bare', giturl, bare_dir])
     else:
         log.debug('Cloning %s' % giturl)
-    cmd.append(giturl)
+        cmd.extend([giturl])
     _run_command(cmd)
     return
 
-def clone_with_dirs(module, user):
+def clone_with_dirs(module, user, path=os.getcwd()):
     """Clone a repo old style with subdirs for each branch.
 
     module is the name of the module to clone
@@ -281,10 +287,34 @@ def clone_with_dirs(module, user):
 
     """
 
-    # not implemented yet
-    print('would have cloned %s with dirs as user %s' % 
-          (module, user))
-    return
+    top_path = os.path.join(path, module)
+
+    try:
+        os.mkdir(top_path)
+    except (OSError), e:
+        raise FedpkgError('Could not create directory for module %s: %s' %
+                (module, e))
+
+    clone(module, user, top_path, bare_dir="fedpkg.git")
+    repo_path = os.path.join(top_path, "fedpkg.git")
+
+    repo_git = git.Git(repo_path)
+    branches = [x for x in repo_git.branch().split() if x != "*"]
+    top_git = git.Git(top_path)
+
+    for branch in branches:
+        try:
+            branch_path = os.path.join(top_path, branch)
+            # Git will automatically use hardlinks for local clones if such is
+            # possible. No need for fancy switches.
+            top_git.clone("--branch", branch, repo_path, branch)
+        except (git.GitCommandError, OSError), e:
+            raise FedpkgError('Could not locally clone %s from %s: %s' %
+                    (branch, repo_path, e))
+
+    # consistent with clone method since the commands should return 0 when
+    # successful.
+    return 0
 
 def get_latest_commit(module):
     """Discover the latest commit has for a given module and return it"""
