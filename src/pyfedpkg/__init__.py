@@ -548,6 +548,76 @@ class PackageModule:
         self.kojisession.uploadWrapper(file, path, callback = callback)
         return
 
+    def import_srpm(self, srpm):
+        """Import the contents of an srpm into a repo.
+
+        srpm: File to import contents from
+
+        This function will add/remove content to match the srpm,
+
+        upload new files to the lookaside, and stage the changes.
+
+        Returns nothing or raises.
+
+        """
+
+
+        # see if the srpm even exists
+        srpm = os.path.abspath(srpm)
+        if not os.path.exists(srpm):
+            raise FedpkgError('File not found.')
+        # bail if we're dirty
+        if self.repo.is_dirty():
+            raise FedpkgError('There are uncommitted changes in your repo')
+        # Get the details of the srpm
+        name, files, uploadfiles = _srpmdetails(srpm)
+
+        # See if our module matches the srpm we're trying to imoprt
+        if name != self.module:
+            raise FedpkgError('Srpm does not match module')
+
+        # Get a list of files we're currently tracking
+        ourfiles = self.repo.git.ls_files().split()
+        # Trim out sources and .gitignore
+        ourfiles.remove('.gitignore')
+        ourfiles.remove('sources')
+
+        # Things work better if we're in our module directory
+        oldpath = os.getcwd()
+        os.chdir(self.path)
+
+        # Look through our files and if it isn't in the new files, remove it.
+        for file in ourfiles:
+            if file not in files:
+                log.info("Removing no longer used file: %s" % file)
+                rv = self.repo.index.remove([file])
+                os.remove(file)
+
+        # Extract new files
+        cmd = ['rpm2cpio', srpm]
+        # We have to force cpio to copy out (u) because git messes with
+        # timestamps
+        cmd2 = ['cpio', '-iud', '--quiet']
+
+        rpmcall = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        cpiocall = subprocess.Popen(cmd2, stdin=rpmcall.stdout)
+        output, err = cpiocall.communicate()
+        if output:
+            log.debug(output)
+        if err:
+            os.chdir(oldpath)
+            raise FedpkgError("Got an error from rpm2cpio: %s" % err)
+
+        # now process the upload files
+        self.new_sources(uploadfiles)
+        # And finally add all the files we know about (and our stock files)
+        files.append('.gitignore')
+        files.append('sources')
+        rv = self.repo.index.add(files)
+        # Return to the caller and let them take it from there.
+        os.chdir(oldpath)
+        return
+
     def init_koji(self, user, kojiconfig=None, url=None):
         """Initiate a koji session.  Available options are:
 
