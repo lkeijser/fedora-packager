@@ -18,12 +18,16 @@ import rpm
 import logging
 import git
 import ConfigParser
+import tempfile
 
 # Define some global variables, put them here to make it easy to change
 LOOKASIDE = 'http://cvs.fedoraproject.org/repo/pkgs'
 LOOKASIDEHASH = 'md5'
 GITBASEURL = 'ssh://%(user)s@pkgs.stg.fedoraproject.org/%(module)s'
 ANONGITURL = 'git://pkgs.stg.fedoraproject.org/%(module)s'
+UPLOADEXTS = ['tar', 'gz', 'bz2', 'lzma', 'xz', 'Z', 'zip', 'tff', 'bin',
+              'tbz', 'tbz2', 'tlz', 'txz', 'pdf', 'rpm', 'jar', 'war', 'db',
+              'cpio', 'jisp', 'egg', 'gem']
 
 # Define our own error class
 class FedpkgError(Exception):
@@ -107,6 +111,48 @@ def _get_build_arches_from_srpm(srpm, arches):
     if not archlist:
         raise FedpkgError('No compatible build arches found in %s' % srpm)
     return archlist
+
+def _srpmdetails(srpm):
+    """Return a tuple of package name, package files, and upload files."""
+
+    # get the name
+    cmd = ['rpm', '-qp', '--qf', '%{NAME}', srpm]
+            # Run the command
+    log.debug('Running: %s' % subprocess.list2cmdline(cmd))
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        output, error = proc.communicate()
+    except OSError, e:
+        raise FedpkgError(e)
+    name = output
+    if error:
+        log.error(error)
+        raise FedpkgError('Error querying srpm')
+
+    # now get the files and upload files
+    files = []
+    uploadfiles = []
+    cmd = ['rpm', '-qpl', srpm]
+    log.debug('Running: %s' % subprocess.list2cmdline(cmd))
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        output, error = proc.communicate()
+    except OSError, e:
+        raise FedpkgError(e)
+    if error:
+        log.error(error)
+        raise FedpkgError('Error querying srpm')
+    contents = output.split()
+    # Cycle through the stuff and sort correctly by its extension
+    for file in contents:
+        if file.rsplit('.')[-1] in UPLOADEXTS:
+            uploadfiles.append(file)
+        else:
+            files.append(file)
+
+    return((name, files, uploadfiles))
 
 def clean(dry=False, useignore=True):
     """Clean a module checkout of untracked files.
