@@ -433,6 +433,26 @@ def gimmespec(args):
         log.error('Could not get spec file: %s' % e)
         sys.exit(1)
 
+def import_srpm(args):
+    # See if we need to create a module from scratch, and do so
+    if args.create:
+        log.warning('Not implimented yet.')
+        sys.exit(0)
+    if not args.create:
+        try:
+            mymodule = pyfedpkg.PackageModule(args.path)
+            if not mymodule.import_srpm(args.srpm):
+                print("New content staged and new sources uploaded.")
+                print("Review with: git diff --cached")
+                print("Commit if happy or revert with: git reset --hard HEAD")
+                return
+            else:
+                log.error("Unable to import srpm")
+                sys.exit(1)
+        except pyfedpkg.FedpkgError, e:
+            log.error('Could import srpm: %s' % e)
+            sys.exit(1)
+
 def install(args):
     arch = None
     short = False
@@ -687,6 +707,19 @@ packages will be built sequentially.
     parser_gimmespec = subparsers.add_parser('gimmespec',
                                              help = 'print spec file name')
     parser_gimmespec.set_defaults(command = gimmespec)
+
+    # Import content into a module
+    parser_import_srpm = subparsers.add_parser('import',
+                                          help = 'Import content into a module')
+    parser_import_srpm.add_argument('--branch', '-b',
+                                    help = 'Branch to import onto',
+                                    default = 'devel')
+    parser_import_srpm.add_argument('--create', '-c',
+                                    help = 'Create a new local repo',
+                                    action = 'store_true')
+    parser_import_srpm.add_argument('srpm',
+                                    help = 'Source rpm to import')
+    parser_import_srpm.set_defaults(command = import_srpm)
 
     # install locally
     parser_install = subparsers.add_parser('install',
