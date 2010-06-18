@@ -611,8 +611,9 @@ class PackageModule:
         # now process the upload files
         self.new_sources(uploadfiles)
         # And finally add all the files we know about (and our stock files)
-        files.append('.gitignore')
-        files.append('sources')
+        for file in ('.gitignore', 'sources'):
+            if os.path.exists(file):
+                files.append(file)
         rv = self.repo.index.add(files)
         # Return to the caller and let them take it from there.
         os.chdir(oldpath)
