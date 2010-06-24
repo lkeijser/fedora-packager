@@ -251,6 +251,85 @@ def get_latest_commit(module):
     # Return the hash sum
     return output.split()[0]
 
+def import_srpm(repo, srpm, path=os.getcwd()):
+    """Import the contents of an srpm into a repo.
+
+    repo: a git repo object to use for the import
+
+    srpm: File to import contents from
+
+    path: optional path to work in, defaults to cwd.
+
+    This function will add/remove content to match the srpm,
+
+    upload new files to the lookaside, and stage the changes.
+
+    Returns a list of files to upload.
+
+    """
+
+    # see if the srpm even exists
+    srpm = os.path.abspath(srpm)
+    if not os.path.exists(srpm):
+        raise FedpkgError('File not found.')
+    # bail if we're dirty
+    if repo.is_dirty():
+        raise FedpkgError('There are uncommitted changes in your repo')
+    # Get the details of the srpm
+    name, files, uploadfiles = _srpmdetails(srpm)
+
+    # Need a way to make sure the srpm name matches the repo some how.
+
+    # Get a list of files we're currently tracking
+    ourfiles = repo.git.ls_files().split()
+    # Trim out sources and .gitignore
+    try:
+        ourfiles.remove('.gitignore')
+        ourfiles.remove('sources')
+    except ValueError:
+        pass
+    try:
+        ourfiles.remove('sources')
+    except ValueError:
+        pass
+
+    # Things work better if we're in our module directory
+    oldpath = os.getcwd()
+    os.chdir(path)
+
+    # Look through our files and if it isn't in the new files, remove it.
+    for file in ourfiles:
+        if file not in files:
+            log.info("Removing no longer used file: %s" % file)
+            rv = repo.index.remove([file])
+            os.remove(file)
+
+    # Extract new files
+    cmd = ['rpm2cpio', srpm]
+    # We have to force cpio to copy out (u) because git messes with
+    # timestamps
+    cmd2 = ['cpio', '-iud', '--quiet']
+
+    rpmcall = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    cpiocall = subprocess.Popen(cmd2, stdin=rpmcall.stdout)
+    output, err = cpiocall.communicate()
+    if output:
+        log.debug(output)
+    if err:
+        os.chdir(oldpath)
+        raise FedpkgError("Got an error from rpm2cpio: %s" % err)
+
+    # And finally add all the files we know about (and our stock files)
+    for file in ('.gitignore', 'sources'):
+        if not os.path.exists(file):
+            # Create the file
+            open(file, 'w').close()
+        files.append(file)
+    rv = repo.index.add(files)
+    # Return to the caller and let them take it from there.
+    os.chdir(oldpath)
+    return(uploadfiles)
+
 def new(path=os.getcwd()):
     """Return changes in a repo since the last tag"""
 
@@ -546,87 +625,6 @@ class PackageModule:
             raise FedpkgError('No active koji session.')
         # This should have a try and catch koji errors
         self.kojisession.uploadWrapper(file, path, callback = callback)
-        return
-
-    def import_srpm(self, srpm):
-        """Import the contents of an srpm into a repo.
-
-        srpm: File to import contents from
-
-        This function will add/remove content to match the srpm,
-
-        upload new files to the lookaside, and stage the changes.
-
-        Returns nothing or raises.
-
-        """
-
-
-        # see if the srpm even exists
-        srpm = os.path.abspath(srpm)
-        if not os.path.exists(srpm):
-            raise FedpkgError('File not found.')
-        # bail if we're dirty
-        if self.repo.is_dirty():
-            raise FedpkgError('There are uncommitted changes in your repo')
-        # Get the details of the srpm
-        name, files, uploadfiles = _srpmdetails(srpm)
-
-        # See if our module matches the srpm we're trying to imoprt
-        if name != self.module:
-            raise FedpkgError('Srpm does not match module')
-
-        # Get a list of files we're currently tracking
-        ourfiles = self.repo.git.ls_files().split()
-        # Trim out sources and .gitignore
-        try:
-            ourfiles.remove('.gitignore')
-            ourfiles.remove('sources')
-        except ValueError:
-            pass
-        try:
-            ourfiles.remove('sources')
-        except ValueError:
-            pass
-
-        # Things work better if we're in our module directory
-        oldpath = os.getcwd()
-        os.chdir(self.path)
-
-        # Look through our files and if it isn't in the new files, remove it.
-        for file in ourfiles:
-            if file not in files:
-                log.info("Removing no longer used file: %s" % file)
-                rv = self.repo.index.remove([file])
-                os.remove(file)
-
-        # Extract new files
-        cmd = ['rpm2cpio', srpm]
-        # We have to force cpio to copy out (u) because git messes with
-        # timestamps
-        cmd2 = ['cpio', '-iud', '--quiet']
-
-        rpmcall = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        cpiocall = subprocess.Popen(cmd2, stdin=rpmcall.stdout)
-        output, err = cpiocall.communicate()
-        if output:
-            log.debug(output)
-        if err:
-            os.chdir(oldpath)
-            raise FedpkgError("Got an error from rpm2cpio: %s" % err)
-
-        # now process the upload files
-        if uploadfiles:
-            self.new_sources(uploadfiles)
-        # And finally add all the files we know about (and our stock files)
-        for file in ('.gitignore', 'sources'):
-            if not os.path.exists(file):
-                # Create the file
-                open(file, 'w').close()
-            files.append(file)
-        rv = self.repo.index.add(files)
-        # Return to the caller and let them take it from there.
-        os.chdir(oldpath)
         return
 
     def init_koji(self, user, kojiconfig=None, url=None):

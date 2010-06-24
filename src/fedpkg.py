@@ -441,17 +441,17 @@ def import_srpm(args):
     if not args.create:
         try:
             mymodule = pyfedpkg.PackageModule(args.path)
-            if not mymodule.import_srpm(args.srpm):
-                print("New content staged and new sources uploaded.")
-                print("Review with: git diff --cached")
-                print("Commit if happy or revert with: git reset --hard HEAD")
-                return
-            else:
-                log.error("Unable to import srpm")
-                sys.exit(1)
+            uploadfiles = pyfedpkg.import_srpm(mymodule.repo, args.srpm)
         except pyfedpkg.FedpkgError, e:
             log.error('Could import srpm: %s' % e)
             sys.exit(1)
+        # replace this system call with a proper diff target when it is
+        # readys
+        os.system('GIT_PAGER='' git diff --cached')
+        print('--------------------------------------------')
+        print("New content staged and new sources uploaded.")
+        print("Commit if happy or revert with: git reset --hard HEAD")
+    return
 
 def install(args):
     arch = None
