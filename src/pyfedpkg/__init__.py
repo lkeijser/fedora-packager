@@ -579,8 +579,15 @@ class PackageModule:
         # Get a list of files we're currently tracking
         ourfiles = self.repo.git.ls_files().split()
         # Trim out sources and .gitignore
-        ourfiles.remove('.gitignore')
-        ourfiles.remove('sources')
+        try:
+            ourfiles.remove('.gitignore')
+            ourfiles.remove('sources')
+        except ValueError:
+            pass
+        try:
+            ourfiles.remove('sources')
+        except ValueError:
+            pass
 
         # Things work better if we're in our module directory
         oldpath = os.getcwd()
@@ -609,11 +616,14 @@ class PackageModule:
             raise FedpkgError("Got an error from rpm2cpio: %s" % err)
 
         # now process the upload files
-        self.new_sources(uploadfiles)
+        if uploadfiles:
+            self.new_sources(uploadfiles)
         # And finally add all the files we know about (and our stock files)
         for file in ('.gitignore', 'sources'):
-            if os.path.exists(file):
-                files.append(file)
+            if not os.path.exists(file):
+                # Create the file
+                open(file, 'w').close()
+            files.append(file)
         rv = self.repo.index.add(files)
         # Return to the caller and let them take it from there.
         os.chdir(oldpath)
