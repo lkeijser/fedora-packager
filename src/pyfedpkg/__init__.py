@@ -254,31 +254,23 @@ def clone(module, user, path=os.getcwd(), branch=None):
 
     branch is the name of a branch to checkout instead of origin/master
 
-    Logs the output and returns the return code
+    Logs the output and returns nothing.
 
     """
 
     # construct the git url
     giturl = GITBASEURL % {'user': user, 'module': module}
-    # Create the git object
-    mygit = git.Git(path)
-    # do the clone and capture the output
-    try:
-        if branch:
-            log.debug('Cloning %s with branch %s' % (giturl, branch))
-            retcode, output, error = mygit.clone('--branch', branch,
-                                                 giturl,
-                                                 with_extended_output=True)
-        else:
-            log.debug('Cloning %s' % giturl)
-            retcode, output, error = mygit.clone(giturl,
-                                                 with_extended_output=True)
-    except (git.GitCommandError, OSError), e:
-        raise FedpkgError('Could not clone %s: %s' % (giturl, e))
-    log.info(output)
-    if error:
-        log.error(error)
-    return retcode
+    # Create the command
+    cmd = ['git', 'clone']
+    # do the clone
+    if branch:
+        log.debug('Cloning %s with branch %s' % (giturl, branch))
+        cmd.extend(['--branch', branch])
+    else:
+        log.debug('Cloning %s' % giturl)
+    cmd.append(giturl)
+    _run_command(cmd)
+    return
 
 def clone_with_dirs(module, user):
     """Clone a repo old style with subdirs for each branch.
@@ -600,7 +592,7 @@ class PackageModule:
 
         optionally for a specific arch, or short-circuit it
 
-        Logs the output and returns the returncode
+        Logs the output and returns nothing
 
         """
 
@@ -614,18 +606,9 @@ class PackageModule:
         if short:
             cmd.append('--short-circuit')
         cmd.extend(['-bc', os.path.join(self.path, self.spec)])
-        # Run the command and capture output
-        log.debug('Running: %s' % ' '.join(cmd))
-        try:
-            proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.PIPE,
-                                    stdout=subprocess.PIPE, shell=True)
-            output, error = proc.communicate()
-        except OSError, e:
-            raise FedpkgError(e)
-        log.info(output)
-        if error:
-            log.error(error)
-        return proc.returncode
+        # Run the command
+        _run_command(cmd, shell=True)
+        return
 
     def getver(self):
         """Return the version-release of a package module."""
@@ -750,7 +733,7 @@ class PackageModule:
 
         optionally for a specific arch, or short-circuit it
 
-        Logs the output and returns the returncode
+        Logs the output and returns nothing
 
         """
 
@@ -764,23 +747,14 @@ class PackageModule:
         if short:
             cmd.append('--short-circuit')
         cmd.extend(['-bi', os.path.join(self.path, self.spec)])
-        # Run the command and capture output
-        log.debug('Running: %s' % ' '.join(cmd))
-        try:
-            proc = subprocess.Popen(' '.join(cmd), stderr=subprocess.PIPE,
-                                    stdout=subprocess.PIPE, shell=True)
-            output, error = proc.communicate()
-        except OSError, e:
-            raise FedpkgError(e)
-        log.info(output)
-        if error:
-            log.error(error)
-        return proc.returncode
+        # Run the command
+        _run_command(cmd, shell=True)
+        return
 
     def lint(self):
         """Run rpmlint over a built srpm
 
-        Log the output and return the returncode
+        Log the output and returns nothing
 
         """
 
@@ -799,17 +773,8 @@ class PackageModule:
         cmd = ['rpmlint', os.path.join(self.path, srpm)]
         cmd.extend(rpms)
         # Run the command
-        log.debug('Running: %s' % subprocess.list2cmdline(cmd))
-        try:
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE)
-            output, error = proc.communicate()
-        except OSError, e:
-            raise FedpkgError(e)
-        log.info(output)
-        if error:
-            log.error(error)
-        return proc.returncode
+        _run_command(cmd, shell=True)
+        return
 
     def local(self, arch=None, hashtype='sha256'):
         """rpmbuild locally for given arch.
@@ -858,7 +823,7 @@ class PackageModule:
     def mockbuild(self, mockargs=[]):
         """Build the package in mock, using mockargs
 
-        Log the output and return the returncode
+        Log the output and returns nothing
 
         """
 
@@ -876,17 +841,8 @@ class PackageModule:
                     os.path.join(self.path, self.module, self.ver, self.rel),
                     '--rebuild', srpm])
         # Run the command
-        log.debug('Running: %s' % subprocess.list2cmdline(cmd))
-        try:
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE)
-            output, error = proc.communicate()
-        except OSError, e:
-            raise FedpkgError(e)
-        log.info(output)
-        if error:
-            log.error(error)
-        return proc.returncode
+        _run_command(cmd)
+        return
 
     def new_sources(self, files):
         """Replace source file(s) in the lookaside cache"""
@@ -967,10 +923,7 @@ class PackageModule:
             # Probably need to support wget too
             command = ['curl', '-H',  'Pragma:', '-O', '-R', '-S',  '--fail',
                        '--show-error', url]
-            try:
-                subprocess.check_call(command, cwd=outdir)
-            except subprocess.CalledProcessError, e:
-                raise FedpkgError('Could not download %s: %s' % (url, e))
+            _run_command(command)
             if not _verify_file(outfile, csum, self.lookasidehash):
                 raise FedpkgError('%s failed checksum' % file)
         return
@@ -989,10 +942,7 @@ class PackageModule:
             cmd.extend(["--define '_source_filedigest_algorithm %s'" % hashtype,
                     "--define '_binary_filedigest_algorithm %s'" % hashtype])
         cmd.extend(['--nodeps', '-bs', os.path.join(self.path, self.spec)])
-        try:
-            subprocess.check_call(' '.join(cmd), shell=True)
-        except subprocess.CalledProcessError, e:
-            raise FedpkgError('Could not build %s: %s' % (self.module, e))
+        _run_command(cmd, shell=True)
         return
 
     def unused_patches(self):
