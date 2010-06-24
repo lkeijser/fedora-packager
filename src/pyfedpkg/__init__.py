@@ -88,6 +88,7 @@ def _run_command(cmd, shell=False, env=None):
     environ = os.environ
     if env:
         for item in env.keys():
+            log.debug('Adding %s:%s to the environment' % (item, env[item]))
             environ[item] = env[item]
     # Check if we're supposed to be on a shell.  If so, the command must
     # be a string, and not a list.
@@ -96,6 +97,8 @@ def _run_command(cmd, shell=False, env=None):
         command = ' '.join(cmd)
     # Check to see if we're on a real tty, if so, stream it baby!
     if sys.stdout.isatty():
+        log.debug('Running %s directly on the tty' %
+                  subprocess.list2cmdline(cmd))
         try:
             subprocess.check_call(command, env=environ, stdout=sys.stdout,
                                   stderr=sys.stderr, shell=shell)
@@ -105,6 +108,8 @@ def _run_command(cmd, shell=False, env=None):
             raise FedpkgError()
     else:
         # Ok, we're not on a live tty, so pipe and log.
+        log.debug('Running %s and logging output' %
+                  subprocess.list2cmdline(cmd))
         try:
             proc = subprocess.Popen(command, env=environ,
                                     stdout=subprocess.PIPE,
