@@ -10,6 +10,7 @@
 # the full text of the license.
 
 import os
+import sys
 #import pycurl
 import subprocess
 import hashlib
@@ -65,6 +66,61 @@ def _hash_file(file, hashtype):
         sum.update(chunk)
     input.close()
     return sum.hexdigest()
+
+def _run_command(cmd, shell=False, env=None):
+    """Run the given command.
+
+    Will determine if caller is on a real tty and if so stream to the tty
+
+    Or else will run and log output.
+
+    cmd is a list of the command and arguments
+
+    shell is whether to run in a shell or not, defaults to False
+
+    env is a dict of environment variables to use (if any)
+
+    Raises on error, or returns nothing.
+
+    """
+
+    # Process any environment vairables.
+    environ = os.environ
+    if env:
+        for item in env.keys():
+            environ[item] = env[item]
+    # Check if we're supposed to be on a shell.  If so, the command must
+    # be a string, and not a list.
+    command = cmd
+    if shell:
+        command = ' '.join(cmd)
+    # Check to see if we're on a real tty, if so, stream it baby!
+    if sys.stdout.isatty():
+        try:
+            subprocess.check_call(command, env=environ, stdout=sys.stdout,
+                                  stderr=sys.stderr, shell=shell)
+        except subprocess.CalledProcessError, e:
+            raise FedpkgError(e)
+        except KeyboardInterrupt:
+            raise FedpkgError()
+    else:
+        # Ok, we're not on a live tty, so pipe and log.
+        try:
+            proc = subprocess.Popen(command, env=environ,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, shell=shell)
+            output, error = proc.communicate()
+        except OSError, e:
+            raise FedpkgError(e)
+        log.info(output)
+        if error:
+            log.error(error)
+        if proc.returncode:
+            raise FedpkgError('Command %s returned code %s with error: %s' %
+                              (subprocess.list2cmdline(cmd),
+                               proc.returncode,
+                               error))
+    return
 
 def _verify_file(file, hash, hashtype):
     """Given a file, a hash of that file, and a hashtype, verify.
