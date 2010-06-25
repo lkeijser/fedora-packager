@@ -407,6 +407,17 @@ def clone(args):
     else:
         pyfedpkg.clone(args.module[0], args.user, args.path, args.branch)
 
+def commit(args):
+    try:
+        mymodule = pyfedpkg.PackageModule(args.path)
+        mymodule.commit(args.message, args.file, args.files)
+    except pyfedpkg.FedpkgError, e:
+        log.error('Could not commit: %s' % e)
+        sys.exit(1)
+    if args.push:
+        # do the push command here.
+        pass
+
 def compile(args):
     arch = None
     short = False
@@ -689,6 +700,26 @@ packages will be built sequentially.
     parser_clone.add_argument('module', nargs = 1,
                               help = 'Name of the module to clone')
     parser_clone.set_defaults(command = clone)
+
+    # commit stuff
+    parser_commit = subparsers.add_parser('commit',
+                                          help = 'Commit changes')
+    parser_commit.add_argument('-m', '--message',
+                               default = None,
+                               help = 'Use the given <msg> as the commit message.')
+    parser_commit.add_argument('-F', '--file',
+                               default = None,
+                               help = 'Take the commit message from the given file.')
+    # allow one to commit /and/ push at the same time.
+    parser_commit.add_argument('-p', '--push',
+                               default = False,
+                               action = 'store_true',
+                               help = 'Commit and push as one action')
+    # Allow a list of files to be committed instead of everything
+    parser_commit.add_argument('files', nargs = '*',
+                               default = [],
+                               help = 'Optional list of specific files to commit')
+    parser_commit.set_defaults(command = commit)
 
     # compile locally
     parser_compile = subparsers.add_parser('compile',
