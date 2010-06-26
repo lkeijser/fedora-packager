@@ -11,6 +11,7 @@
 
 import os
 import sys
+import shutil
 #import pycurl
 import subprocess
 import hashlib
@@ -254,6 +255,9 @@ def clone(module, user, path=os.getcwd(), branch=None, bare_dir=None):
 
     branch is the name of a branch to checkout instead of origin/master
 
+    bare_dir is the name of a directory to make a bare clone too if this is a
+    bare clone. None otherwise.
+
     Logs the output and returns nothing.
 
     """
@@ -287,30 +291,42 @@ def clone_with_dirs(module, user, path=os.getcwd()):
 
     """
 
+    # Get the full path of, and git object for, our directory of branches
     top_path = os.path.join(path, module)
+    top_git = git.Git(top_path)
 
+    # Create our new top directory
     try:
         os.mkdir(top_path)
     except (OSError), e:
         raise FedpkgError('Could not create directory for module %s: %s' %
                 (module, e))
 
+    # Create a bare clone first. This gives us a good list of branches
     clone(module, user, top_path, bare_dir="fedpkg.git")
+    # Get the full path to, and a git object for, our new bare repo
     repo_path = os.path.join(top_path, "fedpkg.git")
-
     repo_git = git.Git(repo_path)
+
+    # Get a branch listing
     branches = [x for x in repo_git.branch().split() if x != "*"]
-    top_git = git.Git(top_path)
 
     for branch in branches:
         try:
-            branch_path = os.path.join(top_path, branch)
-            # Git will automatically use hardlinks for local clones if such is
-            # possible. No need for fancy switches.
+            # Make a local clone for our branch
             top_git.clone("--branch", branch, repo_path, branch)
+
+            # Set the origin correctly
+            branch_path = os.path.join(top_path, branch)
+            branch_git = git.Git(branch_path)
+            branch_git.config("--replace-all", "remote.origin.url",
+                    GITBASEURL % {'user': user, 'module': module})
         except (git.GitCommandError, OSError), e:
             raise FedpkgError('Could not locally clone %s from %s: %s' %
                     (branch, repo_path, e))
+
+    # We don't need this now. Ignore errors since keeping it does no harm
+    shutil.rmtree(repo_path, ignore_errors=True)
 
     # consistent with clone method since the commands should return 0 when
     # successful.
