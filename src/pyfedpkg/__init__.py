@@ -12,7 +12,7 @@
 import os
 import sys
 import shutil
-#import pycurl
+import re
 import subprocess
 import hashlib
 import koji
@@ -30,6 +30,7 @@ ANONGITURL = 'git://pkgs.stg.fedoraproject.org/%(module)s'
 UPLOADEXTS = ['tar', 'gz', 'bz2', 'lzma', 'xz', 'Z', 'zip', 'tff', 'bin',
               'tbz', 'tbz2', 'tlz', 'txz', 'pdf', 'rpm', 'jar', 'war', 'db',
               'cpio', 'jisp', 'egg', 'gem']
+BRANCHFILTER = 'FC?-\d\d?|master'
 
 # Define our own error class
 class FedpkgError(Exception):
@@ -309,7 +310,8 @@ def clone_with_dirs(module, user, path=os.getcwd()):
     repo_git = git.Git(repo_path)
 
     # Get a branch listing
-    branches = [x for x in repo_git.branch().split() if x != "*"]
+    branches = [x for x in repo_git.branch().split() if x != "*" and
+            re.match(BRANCHFILTER, x)]
 
     for branch in branches:
         try:
