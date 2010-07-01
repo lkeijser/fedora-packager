@@ -432,6 +432,14 @@ def compile(args):
         log.error('Could not compile: %s' % e)
         sys.exit(1)
 
+def diff(args):
+    try:
+        mymodule = pyfedpkg.PackageModule(args.path)
+        return mymodule.diff(args.cached, args.files)
+    except pyfedpkg.FedpkgError, e:
+        log.error('Could not diff: %s' % e)
+        sys.exit(1)
+
 def export(args):
     # not implimented; not planned
     log.warning('Not implimented yet, got %s' % args)
@@ -733,6 +741,17 @@ packages will be built sequentially.
     #parser_export = subparsers.add_parser('export',
     #                                      help = 'Create a clean export')
     #parser_export.set_defaults(command = export)
+
+    # diff, should work mostly like git diff
+    parser_diff = subparsers.add_parser('diff',
+        help = "Show changes between commits, commit and working tree, etc")
+    parser_diff.add_argument('--cached', default = False,
+                             action = 'store_true',
+                             help = 'View staged changes')
+    parser_diff.add_argument('files', nargs = '*',
+                             default = [],
+                             help = 'Optionally diff specific files')
+    parser_diff.set_defaults(command = diff)
 
     # gimmespec takes an optional path argument, defaults to cwd
     parser_gimmespec = subparsers.add_parser('gimmespec',

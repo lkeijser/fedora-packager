@@ -693,6 +693,35 @@ class PackageModule:
         _run_command(cmd, shell=True)
         return
 
+    def diff(self, cached=False, files=[]):
+        """Excute a git diff
+
+        optionally diff the cached or staged changes
+
+        Takes an optional list of files to diff reletive to the module base
+        directory
+
+        Logs the output and returns nothing
+
+        """
+
+        # Things work better if we're in our module directory
+        oldpath = os.getcwd()
+        os.chdir(self.path)
+
+        # build up the command
+        cmd = ['git', 'diff']
+        if cached:
+            cmd.append('--cached')
+        if files:
+            cmd.extend(files)
+
+        # Run it!
+        _run_command(cmd)
+        # popd
+        os.chdir(oldpath)
+        return
+
     def getver(self):
         """Return the version-release of a package module."""
 
