@@ -13,6 +13,7 @@ import os
 import sys
 import shutil
 import re
+import pycurl
 import subprocess
 import hashlib
 import koji
@@ -20,11 +21,14 @@ import rpm
 import logging
 import git
 import ConfigParser
+import stat
+import StringIO
 import tempfile
 
 # Define some global variables, put them here to make it easy to change
 LOOKASIDE = 'http://cvs.fedoraproject.org/repo/pkgs'
 LOOKASIDEHASH = 'md5'
+LOOKASIDE_CGI = 'https://cvs.fedoraproject.org/repo/pkgs/upload.cgi'
 GITBASEURL = 'ssh://%(user)s@pkgs.stg.fedoraproject.org/%(module)s'
 ANONGITURL = 'git://pkgs.stg.fedoraproject.org/%(module)s'
 UPLOADEXTS = ['tar', 'gz', 'bz2', 'lzma', 'xz', 'Z', 'zip', 'tff', 'bin',
@@ -444,6 +448,145 @@ def new(path=os.getcwd()):
     # Now get the diff
     log.debug('Diffing from tag %s' % tag)
     return repo.git.diff('-M', tag)
+
+
+class Lookaside(object):
+    """ Object for interacting with the lookaside cache. """
+
+    def __init__(self, url=LOOKASIDE_CGI):
+        self.lookaside_cgi = url
+        self.cert_file = os.path.expanduser('~/.fedora.cert')
+        self.ca_cert_file = os.path.expanduser('~/.fedora-server-ca.cert')
+
+    def _create_curl(self):
+        """
+        Common curl setup options used for all requests to lookaside.
+        """
+        curl = pycurl.Curl()
+
+        curl.setopt(pycurl.URL, self.lookaside_cgi)
+
+        # Set the users Fedora certificate:
+        if os.path.exists(self.cert_file):
+            curl.setopt(pycurl.SSLCERT, self.cert_file)
+        else:
+            log.warn("Missing certificate: %s" % self.cert_file)
+
+        # Set the Fedora CA certificate:
+        if os.path.exists(self.ca_cert_file):
+            curl.setopt(pycurl.CAINFO, self.ca_cert_file)
+        else:
+            log.warn("Missing certificate: %s" % self.ca_cert_file)
+
+        return curl
+
+    def file_exists(self, pkg_name, filename, md5sum):
+        """
+        Return True if the given file exists in the lookaside cache, False
+        if not.
+
+        A FedpkgError will be thrown if the request looks bad or something
+        goes wrong. (i.e. the lookaside URL cannot be reached, or the package
+        named does not exist)
+        """
+
+        # String buffer, used to receive output from the curl request:
+        buf = StringIO.StringIO()
+
+        # Setup the POST data for lookaside CGI request. The use of
+        # 'filename' here appears to be what differentiates this
+        # request from an actual file upload.
+        post_data = [
+                ('name', pkg_name),
+                ('md5sum', md5sum),
+                ('filename', filename)]
+
+        curl = self._create_curl()
+        curl.setopt(pycurl.WRITEFUNCTION, buf.write)
+        curl.setopt(pycurl.HTTPPOST, post_data)
+
+        curl.perform()
+        curl.close()
+        output = buf.getvalue().strip()
+
+        # Lookaside CGI script returns these strings depending on whether
+        # or not the file exists:
+        if output == "Available":
+            return True
+        if output == "Missing":
+            return False
+
+        # Something unexpected happened, will trigger if the lookaside URL
+        # cannot be reached, the package named does not exist, and probably
+        # some other scenarios as well.
+        raise FedpkgError("Error checking for %s at: %s" %
+                (filename, self.lookaside_cgi))
+
+    def upload_file(self, pkg_name, filename, md5sum):
+        """ Upload a file to the lookaside cache. """
+
+        # Setup the POST data for lookaside CGI request. The use of
+        # 'file' here appears to trigger the actual upload:
+        post_data = [
+                ('name', pkg_name),
+                ('md5sum', md5sum),
+                ('file', (pycurl.FORM_FILE, filename))]
+
+        curl = self._create_curl()
+        curl.setopt(pycurl.HTTPPOST, post_data)
+
+        # TODO: disabled until safe way to test is known. Watchout for the
+        # file parameter:
+        #curl.perform()
+        #curl.close()
+
+
+class GitIgnore(object):
+    """ Smaller wrapper for managing a .gitignore file and it's entries. """
+
+    def __init__(self, path):
+        """
+        Create GitIgnore object for the given full path to a .gitignore file.
+
+        File does not have to exist yet, and will be created if you write out
+        any changes.
+        """
+        self.path = path
+
+        # Lines of the .gitignore file, used to check if entries need to be added
+        # or already exist.
+        self.__lines = []
+        if os.path.exists(self.path):
+            gitignore_file = open(self.path, 'r')
+            self.__lines = gitignore_file.readlines()
+            gitignore_file.close()
+
+        # Set to True if we end up making any modifications, used to
+        # prevent unecessary writes.
+        self.modified = False
+
+    def add(self, line):
+        """
+        Add a line to .gitignore, but check if it's a duplicate first.
+        """
+
+        # Append a newline character if the given line didn't have one:
+        if line[-1] != '\n':
+            line = "%s\n" % line
+
+        # Add this line if it doesn't already exist:
+        if not line in self.__lines:
+            self.__lines.append(line)
+            self.modified = True
+
+    def write(self):
+        """ Write the new .gitignore file if any modifications were made. """
+        if self.modified:
+            gitignore_file = open(self.path, 'w')
+            for line in self.__lines:
+                gitignore_file.write(line)
+            gitignore_file.close()
+
 
 # Create a class for package module
 class PackageModule:
@@ -958,11 +1101,45 @@ class PackageModule:
 
     def new_sources(self, files):
         """Replace source file(s) in the lookaside cache"""
-    
-        # Not fully implimented yet
-        for file in files:
-            hash = _hash_file(file, self.lookasidehash)
-            print "Would upload %s:%s" % (hash, file)
+
+        oldpath = os.getcwd()
+        os.chdir(self.path)
+
+        # Overwrite existing sources file:
+        sources_file = open('sources', 'w')
+
+        # Will add new sources to .gitignore if they are not already there.
+        gitignore = GitIgnore(os.path.join(self.path, '.gitignore'))
+
+        lookaside = Lookaside()
+        for f in files:
+            # TODO: Skip empty file needed?
+            file_hash = _hash_file(f, self.lookasidehash)
+            log.info("Uploading: %s  %s" % (file_hash, f))
+            file_dir, file_basename = os.path.split(f)
+            sources_file.write("%s  %s\n" % (file_hash, file_basename))
+
+            # Add this file to .gitignore if it's not already there:
+            gitignore.add(file_basename)
+
+            if lookaside.file_exists(self.module, file_basename, file_hash):
+                # Already uploaded, skip it:
+                log.info("File already uploaded: %s" % file_basename)
+            else:
+                # Ensure the new file is readable:
+                os.chmod(f, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+                lookaside.upload_file(self.module, file_basename, file_hash)
+
+        sources_file.close()
+
+        # Write .gitignore with the new sources if anything changed:
+        gitignore.write()
+
+        rv = self.repo.index.add(['sources', '.gitignore'])
+
+        # Change back to original working dir:
+        os.chdir(oldpath)
+
         return
 
     def prep(self, arch=None):
