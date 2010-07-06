@@ -1124,9 +1124,6 @@ class PackageModule:
             file_hash = _hash_file(f, self.lookasidehash)
             log.info("Uploading: %s  %s" % (file_hash, f))
             file_basename = os.path.basename(f)
-            # When we are in append mode, this /may/ trash the file if the
-            # file doesn't end in a new line.  Insert some code here to
-            # prevent that.
             sources_file.write("%s  %s\n" % (file_hash, file_basename))
 
             # Add this file to .gitignore if it's not already there:
