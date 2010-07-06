@@ -1111,8 +1111,10 @@ class PackageModule:
 
         # Decide to overwrite or append to sources:
         if replace:
+            sources = []
             sources_file = open('sources', 'w')
         else:
+            sources = open('sources', 'r').readlines()
             sources_file = open('sources', 'a')
 
         # Will add new sources to .gitignore if they are not already there.
@@ -1124,7 +1126,8 @@ class PackageModule:
             file_hash = _hash_file(f, self.lookasidehash)
             log.info("Uploading: %s  %s" % (file_hash, f))
             file_basename = os.path.basename(f)
-            sources_file.write("%s  %s\n" % (file_hash, file_basename))
+            if not "%s  %s\n" % (file_hash, file_basename) in sources:
+                sources_file.write("%s  %s\n" % (file_hash, file_basename))
 
             # Add this file to .gitignore if it's not already there:
             gitignore.add(file_basename)
