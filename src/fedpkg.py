@@ -533,7 +533,7 @@ def new(args):
 def new_sources(args):
     try:
         mymodule = pyfedpkg.PackageModule(args.path)
-        mymodule.new_sources(args.files)
+        mymodule.upload(args.files, replace=True)
     except pyfedpkg.FedpkgError, e:
         log.error('Could not upload new sources: %s' % e)
         sys.exit(1)

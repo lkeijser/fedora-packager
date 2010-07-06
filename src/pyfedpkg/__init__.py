@@ -1099,14 +1099,21 @@ class PackageModule:
         _run_command(cmd)
         return
 
-    def new_sources(self, files):
-        """Replace source file(s) in the lookaside cache"""
+    def upload(self, files, replace=False):
+        """Upload source file(s) in the lookaside cache
+
+        Can optionally replace the existing tracked sources
+
+        """
 
         oldpath = os.getcwd()
         os.chdir(self.path)
 
-        # Overwrite existing sources file:
-        sources_file = open('sources', 'w')
+        # Decide to overwrite or append to sources:
+        if replace:
+            sources_file = open('sources', 'w')
+        else:
+            sources_file = open('sources', 'a')
 
         # Will add new sources to .gitignore if they are not already there.
         gitignore = GitIgnore(os.path.join(self.path, '.gitignore'))
@@ -1117,6 +1124,9 @@ class PackageModule:
             file_hash = _hash_file(f, self.lookasidehash)
             log.info("Uploading: %s  %s" % (file_hash, f))
             file_basename = os.path.basename(f)
+            # When we are in append mode, this /may/ trash the file if the
+            # file doesn't end in a new line.  Insert some code here to
+            # prevent that.
             sources_file.write("%s  %s\n" % (file_hash, file_basename))
 
             # Add this file to .gitignore if it's not already there:
