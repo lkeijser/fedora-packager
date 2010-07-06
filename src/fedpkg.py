@@ -533,7 +533,7 @@ def new(args):
 def new_sources(args):
     try:
         mymodule = pyfedpkg.PackageModule(args.path)
-        mymodule.upload(args.files, replace=True)
+        mymodule.upload(args.files, replace=args.replace)
     except pyfedpkg.FedpkgError, e:
         log.error('Could not upload new sources: %s' % e)
         sys.exit(1)
@@ -807,7 +807,7 @@ packages will be built sequentially.
     parser_newsources = subparsers.add_parser('new-sources',
                                               help = 'Upload new source files')
     parser_newsources.add_argument('files', nargs = '+')
-    parser_newsources.set_defaults(command = new_sources)
+    parser_newsources.set_defaults(command = new_sources, replace = True)
 
     # patch
     parser_patch = subparsers.add_parser('patch',
@@ -868,6 +868,12 @@ packages will be built sequentially.
     parser_update = subparsers.add_parser('update',
                                     help = 'Submit last build as an update')
     parser_update.set_defaults(command = update)
+
+    # upload target takes one or more files as input
+    parser_upload = subparsers.add_parser('upload',
+                                          help = 'Upload source files')
+    parser_upload.add_argument('files', nargs = '+')
+    parser_upload.set_defaults(command = new_sources, replace = False)
 
     # Get version and release
     parser_verrel = subparsers.add_parser('verrel',
