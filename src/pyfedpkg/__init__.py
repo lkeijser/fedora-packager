@@ -1128,7 +1128,18 @@ class PackageModule:
             else:
                 # Ensure the new file is readable:
                 os.chmod(f, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
-                lookaside.upload_file(self.module, f, file_hash)
+                #lookaside.upload_file(self.module, f, file_hash)
+                # For now don't use the pycurl upload function as it does
+                # not produce any progress output.  Cheat and use curl
+                # directly.
+                # This command is stolen from the dist-cvs make file
+                # It assumes and hard codes the cert file name/location
+                cmd = ['curl', '-k', '--cert',
+                       os.path.expanduser('~/.fedora.cert'), '--fail', '-o',
+                       '/dev/null', '--show-error', '--progress-bar', '-F',
+                       'name=%s' % self.module, '-F', 'md5sum=%s' % file_hash,
+                       '-F', 'file=@%s' % f, LOOKASIDE_CGI]
+                _run_command(cmd)
 
         sources_file.close()
 
