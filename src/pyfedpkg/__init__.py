@@ -522,7 +522,7 @@ class Lookaside(object):
         raise FedpkgError("Error checking for %s at: %s" %
                 (filename, self.lookaside_cgi))
 
-    def upload_file(self, pkg_name, filename, md5sum):
+    def upload_file(self, pkg_name, filepath, md5sum):
         """ Upload a file to the lookaside cache. """
 
         # Setup the POST data for lookaside CGI request. The use of
@@ -530,15 +530,15 @@ class Lookaside(object):
         post_data = [
                 ('name', pkg_name),
                 ('md5sum', md5sum),
-                ('file', (pycurl.FORM_FILE, filename))]
+                ('file', (pycurl.FORM_FILE, filepath))]
 
         curl = self._create_curl()
         curl.setopt(pycurl.HTTPPOST, post_data)
 
         # TODO: disabled until safe way to test is known. Watchout for the
         # file parameter:
-        #curl.perform()
-        #curl.close()
+        curl.perform()
+        curl.close()
 
 
 class GitIgnore(object):
@@ -1116,7 +1116,7 @@ class PackageModule:
             # TODO: Skip empty file needed?
             file_hash = _hash_file(f, self.lookasidehash)
             log.info("Uploading: %s  %s" % (file_hash, f))
-            file_dir, file_basename = os.path.split(f)
+            file_basename = os.path.basename(f)
             sources_file.write("%s  %s\n" % (file_hash, file_basename))
 
             # Add this file to .gitignore if it's not already there:
@@ -1128,7 +1128,7 @@ class PackageModule:
             else:
                 # Ensure the new file is readable:
                 os.chmod(f, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
-                lookaside.upload_file(self.module, file_basename, file_hash)
+                lookaside.upload_file(self.module, f, file_hash)
 
         sources_file.close()
 
