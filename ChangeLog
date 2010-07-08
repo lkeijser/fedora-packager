@@ -1,3 +1,6 @@
+* Thu Jul 08 2010 Dennis Gilmore <dennis@ausil.us> - 0.4.2.2
+- new release with lost of fedpkg fixes
+
 * Mon Jun 14 2010 Dennis Gilmore <dennis@ausil.us> - 0.4.2.1
 - set devel for F-14
 - point builds to koji.stg
