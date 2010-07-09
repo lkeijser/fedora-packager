@@ -356,10 +356,8 @@ def get_latest_commit(module):
     # Return the hash sum
     return output.split()[0]
 
-def import_srpm(repo, srpm, path=os.getcwd()):
+def import_srpm(srpm, path=os.getcwd()):
     """Import the contents of an srpm into a repo.
-
-    repo: a git repo object to use for the import
 
     srpm: File to import contents from
 
@@ -378,6 +376,7 @@ def import_srpm(repo, srpm, path=os.getcwd()):
     if not os.path.exists(srpm):
         raise FedpkgError('File not found.')
     # bail if we're dirty
+    repo = git.Repo(path)
     if repo.is_dirty():
         raise FedpkgError('There are uncommitted changes in your repo')
     # Get the details of the srpm
