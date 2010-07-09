@@ -459,8 +459,8 @@ def import_srpm(args):
         sys.exit(0)
     if not args.create:
         try:
+            uploadfiles = pyfedpkg.import_srpm(args.srpm, path=args.path)
             mymodule = pyfedpkg.PackageModule(args.path)
-            uploadfiles = pyfedpkg.import_srpm(mymodule.repo, args.srpm)
             mymodule.upload(uploadfiles, replace=True)
         except pyfedpkg.FedpkgError, e:
             log.error('Could import srpm: %s' % e)
