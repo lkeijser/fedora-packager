@@ -299,6 +299,7 @@ def clone_with_dirs(module, user, path=os.getcwd()):
     # Get the full path of, and git object for, our directory of branches
     top_path = os.path.join(path, module)
     top_git = git.Git(top_path)
+    repo_path = os.path.join(top_path, 'fedpkg.git')
 
     # Create our new top directory
     try:
@@ -308,9 +309,8 @@ def clone_with_dirs(module, user, path=os.getcwd()):
                 (module, e))
 
     # Create a bare clone first. This gives us a good list of branches
-    clone(module, user, top_path, bare_dir="fedpkg.git")
+    clone(module, user, top_path, bare_dir=repo_path)
     # Get the full path to, and a git object for, our new bare repo
-    repo_path = os.path.join(top_path, "fedpkg.git")
     repo_git = git.Git(repo_path)
 
     # Get a branch listing
