@@ -402,10 +402,14 @@ def clone(args):
         except:
             log.debug('Could not read Fedora cert, using login name')
             args.user = os.getlogin()
-    if args.branches:
-        pyfedpkg.clone_with_dirs(args.module[0], args.user)
-    else:
-        pyfedpkg.clone(args.module[0], args.user, args.path, args.branch)
+    try:
+        if args.branches:
+            pyfedpkg.clone_with_dirs(args.module[0], args.user)
+        else:
+            pyfedpkg.clone(args.module[0], args.user, args.path, args.branch)
+    except pyfedpkg.FedpkgError, e:
+        log.error('Could not clone: %s' % e)
+        sys.exit(1)
 
 def commit(args):
     try:
