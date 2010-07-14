@@ -467,7 +467,7 @@ def import_srpm(args):
             mymodule = pyfedpkg.PackageModule(args.path)
             mymodule.upload(uploadfiles, replace=True)
         except pyfedpkg.FedpkgError, e:
-            log.error('Could import srpm: %s' % e)
+            log.error('Could not import srpm: %s' % e)
             sys.exit(1)
         # replace this system call with a proper diff target when it is
         # readys
