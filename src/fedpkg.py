@@ -881,8 +881,9 @@ packages will be built sequentially.
 
     # upload target takes one or more files as input
     parser_upload = subparsers.add_parser('upload',
+                                          parents = [parser_newsources],
+                                          conflict_handler = 'resolve',
                                           help = 'Upload source files')
-    parser_upload.add_argument('files', nargs = '+')
     parser_upload.set_defaults(command = new_sources, replace = False)
 
     # Get version and release
