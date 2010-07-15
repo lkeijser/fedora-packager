@@ -715,6 +715,10 @@ packages will be built sequentially.
                               help = 'Name of the module to clone')
     parser_clone.set_defaults(command = clone)
 
+    parser_co = subparsers.add_parser('co', parents = [parser_clone],
+                                      conflict_handler = 'resolve')
+    parser_co.set_defaults(command = clone)
+
     # commit stuff
     parser_commit = subparsers.add_parser('commit',
                                           help = 'Commit changes')
