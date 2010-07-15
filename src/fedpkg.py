@@ -266,6 +266,18 @@ def _progress_callback(uploaded, total, piece, time, total_time):
     sys.stdout.write("[% -36s] % 4s % 8s % 10s % 14s\r" % ('='*(int(percent_done*36)), percent_done_str, elapsed, data_done, speed))
     sys.stdout.flush()
 
+def switch_branch(args):
+    if args.branch:
+        try:
+            pyfedpkg.switch_branch(args.branch)
+        except pyfedpkg.FedpkgError, e:
+            log.debug('Unable to switch to another branch: %s' % e)
+    else:
+        try:
+            pyfedpkg.switch_branch(list=1)
+        except pyfedpkg.FedpkgError, e:
+            log.debug('Unable to list branches: %s' % e)
+
 def build(args):
     # We may not actually nave an srpm arg if we come directly from the build task
     if hasattr(args, 'srpm') and args.srpm and not args.scratch:
@@ -638,7 +650,16 @@ if __name__ == '__main__':
     # Add help to -h and --help
     parser_help = subparsers.add_parser('help', help = 'Show usage')
     parser_help.set_defaults(command = usage)
-
+    
+    # switch branches
+    parser_switchbranch = subparsers.add_parser('switch-branch',
+                                help = 'Work with branches')
+    parser_switchbranch.add_argument('branch',  nargs = '?')
+    parser_switchbranch.add_argument('-l', '--list',
+                                help = 'List both remote-tracking branches and local branches',
+                                action = 'store_true')
+    parser_switchbranch.set_defaults(command = switch_branch, replace = True)
+    
     # Add a common build parser to be used as a parent
     parser_build_common = subparsers.add_parser('build_common',
                                                 add_help = False)

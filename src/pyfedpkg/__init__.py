@@ -251,6 +251,28 @@ def clean(dry=False, useignore=True):
         log.error(error)
     return proc.returncode
 
+def switch_branch(branch=None, list=None):
+    """Work with different branches.
+
+    branch is the name of the branch to switch to
+
+    Logs output and returns nothing.
+    """
+    if list:
+        cmd = ['git', 'branch']
+        print "Listing branches"
+        cmd.extend(['-a'])
+        _run_command(cmd)
+    else:
+        cmd = ['git', 'checkout']
+        cmd.extend([branch])
+        log.debug('Switching to branch %s' % branch)
+        try:
+            _run_command(cmd)
+        except FedpkgError:
+            sys.exit(1)
+    return
+
 def clone(module, user, path=os.getcwd(), branch=None, bare_dir=None):
     """Clone a repo, optionally check out a specific branch.
 
