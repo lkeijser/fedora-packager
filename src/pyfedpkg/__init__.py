@@ -869,28 +869,36 @@ class PackageModule:
 
         cmd = ['rpm']
         cmd.extend(self.rpmdefines)
-        cmd.extend(['-q', '--qf', '%{VERSION}', '--specfile',
+        # We make sure there is a space at the end of our query so that
+        # we can split it later.  When ther eare sub packages, we get a
+        # listing for each subpackage.  We only care about the first.
+        cmd.extend(['-q', '--qf', '"%{VERSION} "', '--specfile',
                     os.path.join(self.path, self.spec)])
         try:
             output = subprocess.Popen(' '.join(cmd), shell=True,
                                       stdout=subprocess.PIPE).communicate()
         except subprocess.CalledProcessError, e:
             raise FedpkgError('Could not get version of %s: %s' % (self.module, e))
-        return output[0]
+        # Get just the output, then split it by space, grab the first
+        return output[0].split()[0]
 
     def getrel(self):
         """Return the version-release of a package module."""
 
         cmd = ['rpm']
         cmd.extend(self.rpmdefines)
-        cmd.extend(['-q', '--qf', '%{RELEASE}', '--specfile',
+        # We make sure there is a space at the end of our query so that
+        # we can split it later.  When ther eare sub packages, we get a
+        # listing for each subpackage.  We only care about the first.
+        cmd.extend(['-q', '--qf', '"%{RELEASE} "', '--specfile',
                     os.path.join(self.path, self.spec)])
         try:
             output = subprocess.Popen(' '.join(cmd), shell=True,
                                       stdout=subprocess.PIPE).communicate()
         except subprocess.CalledProcessError, e:
             raise FedpkgError('Could not get release of %s: %s' % (self.module, e))
-        return output[0]
+        # Get just the output, then split it by space, grab the first
+        return output[0].split()[0]
 
     def gimmespec(self):
         """Return the name of a specfile within a package module"""
