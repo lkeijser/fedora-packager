@@ -679,6 +679,8 @@ class PackageModule:
 
         """
 
+        # build up the command that a user would issue
+        cmd = ['koji']
         # Make sure we have a valid session.
         if not self.kojisession:
             raise FedpkgError('No koji session found.')
@@ -709,37 +711,48 @@ class PackageModule:
             raise FedpkgError('Destination tag %s is locked' % dest_tag['name'])
         # If we're chain building, make sure inheritance works
         if chain:
+            cmd.append('chain-build')
             ancestors = self.kojisession.getFullInheritance(build_target['build_tag'])
             if dest_tag['id'] not in [build_target['build_tag']] + [ancestor['parent_id'] for ancestor in ancestors]:
                 raise FedpkgError('Packages in destination tag ' \
                                   '%(dest_tag_name)s are not inherited by' \
                                   'build tag %(build_tag_name)s' %
                                   build_target)
+        else:
+            cmd.append('build')
         # define our dictionary for options
         opts = {}
         # Set a placeholder for the build priority
         priority = None
         if skip_tag:
             opts['skip_tag'] = True
+            cmd.append('--skip-tag')
         if scratch:
             opts['scratch'] = True
+            cmd.append('--scratch')
         if background:
+            cmd.append('--background')
             priority = 5 # magic koji number :/
 
+        cmd.append(self.target)
         # Now submit the task and get the task_id to return
         # Handle the chain build version
         if chain:
             log.debug('Adding %s to the chain' % url)
             chain[-1].append(url)
+            cmd.append(url)
             log.debug('Building chain %s for %s with options %s and a ' \
                       'priority of %s' %
                       (chain, self.target, opts, priority))
+            log.debug(subprocess.list2cmdline(cmd))
             task_id = self.kojisession.chainBuild(chain, self.target, opts,
                                                   priority=priority)
         # Now handle the normal build
         else:
+            cmd.append(url)
             log.debug('Building %s for %s with options %s and a priority of %s' %
                       (url, self.target, opts, priority))
+            log.debug(subprocess.list2cmdline(cmd))
             task_id = self.kojisession.build(url, self.target, opts,
                                              priority=priority)
         log.info('Created task: %s' % task_id)
