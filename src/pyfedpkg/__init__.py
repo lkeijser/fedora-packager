@@ -980,7 +980,11 @@ class PackageModule:
         session_opts = {'user': user}
         # We assign the kojisession to our self as it can be used later to
         # watch the tasks.
-        self.kojisession = koji.ClientSession(defaults['server'], session_opts)
+        log.debug('Initiating a koji session to %s' % defaults['server'])
+        try:
+            self.kojisession = koji.ClientSession(defaults['server'], session_opts)
+        except:
+            raise FedpkgError('Could not initiate koji session')
         # save the weburl for later use too
         self.kojiweburl = defaults['weburl']
         # log in using ssl
